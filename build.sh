@@ -171,9 +171,18 @@ if mountpoint -q "$ROOTFS/var/cache/apt/archives"; then
     umount -l "$ROOTFS/var/cache/apt/archives"
     rm -rf "$ROOTFS/var/cache/apt/archives/"* "$ROOTFS/var/cache/apt/archives/partial"
 fi
-echo "$(du -sh "$APT_CACHE_DIR" | cut -f1) of apt packages cached before pruning"
-# Keep the CI cache bounded: drop superseded package files periodically.
-find "$APT_CACHE_DIR" -name '*.deb' -type f -mtime +14 -delete
+echo "$(du -sh "$APT_CACHE_DIR" | cut -f1) of apt packages cached before eviction"
+# Keep the CI cache bounded. NOTE: do NOT prune by -mtime — apt stamps .deb
+# files with the archive mirror's own mtime (their release date), not the
+# download date, so an mtime-based prune would empty the cache after every
+# run. Evict whole files oldest-first while the cache exceeds 5 GiB instead,
+# which keeps the commonly reused recent packages and stays under the
+# repository's cache allowance with room to spare.
+while [ "$(du -sBM --apparent-size "$APT_CACHE_DIR" | cut -f1)" -gt 5000 ]; do
+    oldest=$(find "$APT_CACHE_DIR" -name '*.deb' -type f -printf '%T@ %p\n' | sort -n | head -n 1 | cut -d' ' -f2-)
+    [ -n "$oldest" ] || break
+    rm -f "$oldest"
+done
 echo "$(du -sh "$APT_CACHE_DIR" | cut -f1) of apt packages cached for the next run"
 
 # ---------------------------------------------------------------------------

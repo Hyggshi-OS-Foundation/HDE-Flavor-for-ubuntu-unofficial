@@ -64,9 +64,12 @@ jobs:
         # debootstrap + chroot apt download well over 1 GB per build; the
         # build stages download into $WORKDIR/apt-cache (debootstrap
         # --cache-dir, then a bind-mount over the chroot's apt archives), so
-        # the cache action can hand it across runs. The key rolls when the
-        # base suite input changes.
-        uses: actions/cache@v4
+        # the cache can hand it across runs. Restore and save are split so
+        # the save also happens when the build itself fails: during feature
+        # iteration several runs in a row fail, and each would otherwise
+        # throw away another GB of downloads. The key rolls when the base
+        # suite input changes.
+        uses: actions/cache/restore@v4
         with:
           path: ${{ env.WORKDIR }}/apt-cache
           key: apt-${{ runner.os }}-${{ github.event.inputs.base-suite || 'noble-default' }}-v1
@@ -92,6 +95,13 @@ jobs:
           path: ${{ env.WORKDIR }}/logs/*
           retention-days: 7
           if-no-files-found: ignore
+
+      - name: Save the APT package cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.WORKDIR }}/apt-cache
+          key: apt-${{ runner.os }}-${{ github.event.inputs.base-suite || 'noble-default' }}-v1
 
       - name: Identify the built ISO
         id: iso
