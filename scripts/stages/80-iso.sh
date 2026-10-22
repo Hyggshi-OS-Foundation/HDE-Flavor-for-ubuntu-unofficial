@@ -9,7 +9,7 @@
 #   Result: one hybrid ISO, verified by the QEMU smoke test on both paths.
 
 set -euo pipefail
-. "$(dirname "${BASH_SOURCE[0]}")/common.sh"
+. "$(dirname "${BASH_SOURCE[0]}")/../common.sh"
 ensure_flavor_config
 
 ISO_STAGE="${ISO_STAGE:?}"

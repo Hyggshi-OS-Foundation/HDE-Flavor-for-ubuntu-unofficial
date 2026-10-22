@@ -8,7 +8,7 @@
 # Runs on the host (runner) as root. Expects $ROOTFS and $BASE_SUITE exported.
 
 set -euo pipefail
-. "$(dirname "${BASH_SOURCE[0]}")/common.sh"
+. "$(dirname "${BASH_SOURCE[0]}")/../common.sh"
 ensure_flavor_config
 
 ROOTFS="${ROOTFS:?}"
