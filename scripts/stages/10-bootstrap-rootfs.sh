@@ -16,11 +16,20 @@ BASE_SUITE="${BASE_SUITE:?}"
 
 say "bootstrap $BASE_SUITE base filesystem into $ROOTFS"
 
-debootstrap \
+# debootstrap's --components takes a COMMA-separated list (it becomes the
+# '|' alternation of a case pattern); a space-separated value is a shell
+# syntax error there, and debootstrap's stderr (where it would be reported)
+# goes only into its internal log. APT_COMPONENTS is space-separated for
+# apt sources.list, so convert it here.
+if ! debootstrap \
     --arch=amd64 \
     --variant=minbase \
-    --components="$APT_COMPONENTS" \
-    "$BASE_SUITE" "$ROOTFS" "$APT_MIRROR"
+    --components="$(printf '%s' "$APT_COMPONENTS" | tr ' ' ',')" \
+    "$BASE_SUITE" "$ROOTFS" "$APT_MIRROR"; then
+    echo "debootstrap failed; the tail of its internal log follows:" >&2
+    tail -n 50 "$ROOTFS/debootstrap/debootstrap.log" 2>/dev/null || true
+    exit 1
+fi
 
 # apt sources: debootstrap writes defaults; make them explicit for the suite.
 cat > "$ROOTFS/etc/apt/sources.list" <<EOF
