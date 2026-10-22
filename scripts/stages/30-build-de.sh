@@ -18,11 +18,9 @@ step "apply the pinned-source patches carried by this repo"
 # change.
 for p in /repo/patches/*.patch; do
     [ -e "$p" ] || continue
-    if patch --forward -d "$SRC_IN_CHROOT" -p1 < "$p"; then
-        echo "applied $(basename "$p")"
-    else
-        echo "WARNING: $(basename "$p") did not apply cleanly" >&2
-    fi
+    command -v patch >/dev/null 2>&1 || die "patch(1) is not available in the chroot: cannot apply $(basename "$p")"
+    patch --forward -d "$SRC_IN_CHROOT" -p1 < "$p" || die "$(basename "$p") did not apply to the pinned HDE source"
+    echo "applied $(basename "$p")"
 done
 
 BUILD_SCRIPT="$SRC_IN_CHROOT/$HDE_BUILD_SCRIPT"

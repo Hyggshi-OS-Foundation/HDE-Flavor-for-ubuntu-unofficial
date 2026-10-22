@@ -14,6 +14,9 @@ systemd-sysv
 casper
 linux-generic
 
+# patches/*.patch are applied to the pinned HDE source before it is built
+patch
+
 # GRUB for the live medium and EFI boot. grub-pc must NOT be in the same
 # chroot as grub-efi-amd64 (hard Conflicts in the archive); Calamares installs
 # grub-pc or grub-efi-amd64 into the *installed target* as appropriate, so
