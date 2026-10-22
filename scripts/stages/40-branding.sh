@@ -16,7 +16,10 @@ step "os-release / lsb-release / issue"
 sed -e "s/__VERSION__/$BASE_VERSION/g" -e "s/__CODENAME__/$BASE_SUITE/g" \
     "$REPO_DIR/config/os-release" > /usr/lib/os-release
 chmod 0644 /usr/lib/os-release
-cp /usr/lib/os-release /etc/os-release
+# On Ubuntu rootfs, /etc/os-release is a symlink to /usr/lib/os-release: the
+# content above is already both. Only when something diverged (not a symlink)
+# refresh /etc explicitly.
+[ -L /etc/os-release ] || cp /usr/lib/os-release /etc/os-release
 if command -v lsb_release >/dev/null 2>&1; then
     {
         echo "DISTRIB_ID=nexwmos"
