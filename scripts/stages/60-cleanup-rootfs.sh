@@ -9,6 +9,11 @@ ensure_flavor_config
 
 step "rootfs hygiene before squashfs"
 rm -f /usr/sbin/policy-rc.d
+# SDDM/live machinery installs sudo as a dependency; autoremove below then
+# tries to remove it and sudo's own pre-removal script refuses, which halts
+# dpkg half-way through the -dev purge. Mark it (and the live runtime it
+# serves) as wanted before purging.
+apt-mark manual sudo 2>/dev/null || true
 # Compiler toolchain leftovers from the HDE build (-dev packages have no
 # runtime role in an installed desktop system).
 apt-get purge -y --allow-remove-essential \

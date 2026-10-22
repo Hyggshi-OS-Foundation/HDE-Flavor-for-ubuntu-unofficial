@@ -39,10 +39,14 @@ printf '%s live build (%s; based on Ubuntu %s LTS)\n' \
     "$FLAVOR_NAME" "$(date -u +%Y%m%dT%H%M%SZ)" "$BASE_SUITE" > "$ISO_STAGE/.disk/info"
 
 step "mksquashfs (zstd; pseudo-filesystem mounts are empty after teardown)"
-mksquashfs "$ROOTFS" "$ISO_STAGE/casper/filesystem.squashfs" \
+if ! mksquashfs "$ROOTFS" "$ISO_STAGE/casper/filesystem.squashfs" \
     -noappend -comp zstd -Xcompression-level 19 \
-    -wildcards -e '/proc/*' -e '/sys/*' -e '/dev/*' \
-    > "${BUILD_LOG_DIR:-$PWD}/mksquashfs.log" 2>&1 || true
+    -e proc -e sys -e dev \
+    > "${BUILD_LOG_DIR:-$PWD}/mksquashfs.log" 2>&1; then
+    echo "mksquashfs failed; the tail of its log follows:" >&2
+    tail -n 30 "${BUILD_LOG_DIR:-$PWD}/mksquashfs.log" >&2 || true
+    exit 1
+fi
 
 [ -s "$ISO_STAGE/casper/filesystem.squashfs" ] || die "mksquashfs produced an empty image"
 
