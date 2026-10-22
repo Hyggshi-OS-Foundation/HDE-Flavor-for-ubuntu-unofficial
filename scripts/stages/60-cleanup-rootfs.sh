@@ -14,8 +14,11 @@ rm -f /usr/sbin/policy-rc.d
 apt-get purge -y --allow-remove-essential \
     $(dpkg-query -W -f='${binary:Package}\n' | grep -E '(-dev|-dbg)$') 2>/dev/null || true
 apt-get autoremove -y --purge || true
-apt-get clean
-rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*.deb /var/cache/apt/archives/partial
+rm -rf /var/lib/apt/lists/*
+# NOTE: the apt archives dir is bind-mounted to the CI-shared cache while the
+# chroot stages run; build.sh unmounts it and empties the chroot-side copy
+# after this stage. Do NOT apt-get clean or rm the archives here: it would
+# erase the shared cache and cost a full re-download next run.
 journalctl --rotate --vacuum-time=1s 2>/dev/null || rm -rf /var/log/journal
 rm -rf /tmp/* /var/tmp/* /root/.cache/* 2>/dev/null || true
 : > /var/log/dpkg.log

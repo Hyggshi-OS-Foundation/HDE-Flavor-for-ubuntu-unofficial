@@ -68,6 +68,7 @@ teardown_mounts() {
     mountpoint -q "$root/run"     2>/dev/null && umount -l "$root/run"     2>/dev/null || true
     mountpoint -q "$root/dev"     2>/dev/null && umount -l "$root/dev"     2>/dev/null || true
     mountpoint -q "$root/repo"    2>/dev/null && umount -l "$root/repo"    2>/dev/null || true
+    mountpoint -q "$root/var/cache/apt/archives" 2>/dev/null && umount -l "$root/var/cache/apt/archives" 2>/dev/null || true
     # Belt and braces: anything still mounted under the rootfs path.
     local mounts
     while true; do

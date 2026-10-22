@@ -60,6 +60,20 @@ jobs:
           sudo docker image prune -af 2>/dev/null || true
           df -h /
 
+      - name: Restore the APT package cache
+        # debootstrap + chroot apt download well over 1 GB per build; the
+        # build stages download into $WORKDIR/apt-cache (debootstrap
+        # --cache-dir, then a bind-mount over the chroot's apt archives), so
+        # the cache action can hand it across runs. The key rolls when the
+        # base suite input changes.
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.WORKDIR }}/apt-cache
+          key: apt-${{ runner.os }}-${{ github.event.inputs.base-suite || 'noble-default' }}-v1
+          restore-keys: |
+            apt-${{ runner.os }}-${{ github.event.inputs.base-suite || 'noble-default' }}-
+            apt-${{ runner.os }}-
+
       - name: Build the ISO (debootstrap + HDE + GNOME purge + Calamares + xorriso)
         run: |
           sudo env NEXWM_BASE_SUITE="${{ github.event.inputs.base-suite }}" \

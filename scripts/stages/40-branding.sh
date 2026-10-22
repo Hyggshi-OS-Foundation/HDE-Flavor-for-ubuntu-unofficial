@@ -60,6 +60,7 @@ EOF
 chmod 0644 /etc/casper.conf
 
 step "live autologin (per-boot SDDM configuration)"
+install -d /usr/lib/nexwm-os
 install -m 0755 "$REPO_DIR/config/usr/lib/nexwm-os/live-autologin" /usr/lib/nexwm-os/live-autologin
 install -m 0644 "$REPO_DIR/config/systemd/nexwm-os-live-autologin.service" \
     /etc/systemd/system/nexwm-os-live-autologin.service

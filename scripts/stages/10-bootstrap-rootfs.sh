@@ -21,10 +21,14 @@ say "bootstrap $BASE_SUITE base filesystem into $ROOTFS"
 # syntax error there, and debootstrap's stderr (where it would be reported)
 # goes only into its internal log. APT_COMPONENTS is space-separated for
 # apt sources.list, so convert it here.
+# --cache-dir keeps the downloaded .deb files outside the target so CI can
+# reuse them across runs (see the job's APT cache in the workflow).
+mkdir -p "$APT_CACHE_DIR"
 if ! debootstrap \
     --arch=amd64 \
     --variant=minbase \
     --components="$(printf '%s' "$APT_COMPONENTS" | tr ' ' ',')" \
+    --cache-dir="$APT_CACHE_DIR" \
     "$BASE_SUITE" "$ROOTFS" "$APT_MIRROR"; then
     echo "debootstrap failed; the tail of its internal log follows:" >&2
     tail -n 50 "$ROOTFS/debootstrap/debootstrap.log" 2>/dev/null || true

@@ -39,7 +39,6 @@ ensure_flavor_config
 WORK_DIR="${WORK_DIR:-/srv/nexwm-os-build}"
 BASE_SUITE="${NEXWM_BASE_SUITE:-}"
 WANT_FRESH=0
-
 while [ $# -gt 0 ]; do
     case "$1" in
         --base-suite) BASE_SUITE="$2"; shift 2 ;;
@@ -56,8 +55,9 @@ ISO_STAGE="$WORK_DIR/iso"
 OUT_DIR="$WORK_DIR/out"
 LOG_DIR="$WORK_DIR/logs"
 HDE_SRC="$WORK_DIR/hde"
+APT_CACHE_DIR="$WORK_DIR/apt-cache"   # survives --fresh; CI caches it across runs
 BUILD_LOG_DIR="$LOG_DIR"
-export REPO_DIR WORK_DIR ROOTFS ISO_STAGE OUT_DIR LOG_DIR HDE_SRC BUILD_LOG_DIR
+export REPO_DIR WORK_DIR ROOTFS ISO_STAGE OUT_DIR LOG_DIR HDE_SRC BUILD_LOG_DIR APT_CACHE_DIR
 
 say "NexWM OS build (repo: $(git -C "$REPO_DIR" rev-parse HEAD 2>/dev/null || echo 'no git'))"
 
@@ -118,6 +118,14 @@ mount -t tmpfs tmpfs "$ROOTFS/run"
 mount -t tmpfs tmpfs "$ROOTFS/tmp"
 mount --bind "$REPO_DIR" "$ROOTFS/repo"
 
+# The APT package cache: debootstrap (stage 10) already downloaded into
+# APT_CACHE_DIR; stages 20..60 download through this bind so the cache
+# survives the --fresh rootfs wipe and the CI job caches it across runs.
+# build.sh unmounts it again after stage 60 (stage 60's old apt-get clean
+# would otherwise empty the shared cache) before the squashfs stage.
+mkdir -p "$ROOTFS/var/cache/apt/archives" "$APT_CACHE_DIR"
+mount --bind "$APT_CACHE_DIR" "$ROOTFS/var/cache/apt/archives"
+
 cp /etc/resolv.conf "$ROOTFS/etc/resolv.conf"
 cat > "$ROOTFS/usr/sbin/policy-rc.d" <<'EOF'
 #!/bin/sh
@@ -153,6 +161,20 @@ run_chroot_stage 35-sddm-login
 run_chroot_stage 40-branding
 run_chroot_stage 50-installer
 run_chroot_stage 60-cleanup-rootfs
+
+# Restore the chroot's own cache files before the shared host cache would be
+# confused for them: unmount the bind, then empty the chroot-side archives so
+# the squashfs does not carry package files (stage 60 can no longer do this
+# itself without wiping the shared cache). /var/lib/apt/lists is still emptied
+# by stage 60 before this point, inside the chroot.
+if mountpoint -q "$ROOTFS/var/cache/apt/archives"; then
+    umount -l "$ROOTFS/var/cache/apt/archives"
+    rm -rf "$ROOTFS/var/cache/apt/archives/"* "$ROOTFS/var/cache/apt/archives/partial"
+fi
+echo "$(du -sh "$APT_CACHE_DIR" | cut -f1) of apt packages cached before pruning"
+# Keep the CI cache bounded: drop superseded package files periodically.
+find "$APT_CACHE_DIR" -name '*.deb' -type f -mtime +14 -delete
+echo "$(du -sh "$APT_CACHE_DIR" | cut -f1) of apt packages cached for the next run"
 
 # ---------------------------------------------------------------------------
 # Teardown, then host stages 70..90.
