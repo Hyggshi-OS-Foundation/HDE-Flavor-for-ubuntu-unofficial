@@ -1,0 +1,13 @@
+[Unit]
+Description=NexWM OS live desktop smoke check
+ConditionKernelCommandLine=boot=casper
+After=graphical.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/nexwm-os-live-check
+TimeoutStartSec=0
+RemainAfterExit=yes
+
+[Install]
+WantedBy=graphical.target

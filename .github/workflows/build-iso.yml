@@ -1,0 +1,148 @@
+name: Build and test the NexWM OS ISO
+
+# Whole-build pipeline for the unofficial Ubuntu flavor built around HDE
+# (NexWM). Everything runs on hosted runners — nothing ever executes on a
+# maintainer's machine: debootstrap the newest LTS base, install and build
+# HDE from the pinned NexWM checkout, purge GNOME, assemble the casper live
+# medium with Calamares, build the hybrid ISO, then smoke-test BIOS and UEFI
+# boots under QEMU before anything reaches a release.
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      base-suite:
+        description: 'Ubuntu suite for the rootfs (codename; empty = config/flavor.conf default)'
+        required: false
+        default: ''
+      hde-ref:
+        description: 'NexWM/HDE ref to build (branch or tag; default main)'
+        required: false
+        default: 'main'
+      skip-qemu:
+        description: 'Skip the QEMU firmware smoke tests'
+        type: boolean
+        default: false
+  schedule:
+    # Weekly Monday-morning UTC run: the flavor requirement is to keep a
+    # buildable, installable ISO current against the base archive.
+    - cron: '0 6 * * 1'
+
+permissions:
+  contents: write   # release upload on tags
+
+env:
+  WORKDIR: /srv/nexwm-os-build
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    name: Build ISO
+    runs-on: ubuntu-24.04
+    timeout-minutes: 170
+    outputs:
+      iso_name: ${{ steps.iso.outputs.name }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free disk space on the runner
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup \
+                      /opt/hostedtoolcache/CodeQL /usr/local/share/boost 2>/dev/null || true
+          sudo docker image prune -af 2>/dev/null || true
+          df -h /
+
+      - name: Build the ISO (debootstrap + HDE + GNOME purge + Calamares + xorriso)
+        run: |
+          sudo env NEXWM_BASE_SUITE="${{ github.event.inputs.base-suite }}" \
+                   HDE_REPO_REF="${{ github.event.inputs.hde-ref || 'main' }}" \
+                   bash build.sh --fresh
+
+      - name: Capture stage logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs-${{ github.run_id }}
+          path: ${{ env.WORKDIR }}/logs
+          if-no-files-found: error
+
+      - name: Identify the built ISO
+        id: iso
+        run: |
+          ls -lh "$WORKDIR/out"
+          iso_path=$(ls -1 "$WORKDIR"/out/*.iso | head -n1)
+          echo "name=$(basename "$iso_path")" >> "$GITHUB_OUTPUT"
+
+      - name: Upload the ISO
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.iso.outputs.name }}
+          path: |
+            ${{ env.WORKDIR }}/out/*.iso
+            ${{ env.WORKDIR }}/out/*.sha256
+          retention-days: 14
+          if-no-files-found: error
+          compression-level: 0
+
+  qemusmoke:
+    name: QEMU smoke (BIOS + UEFI)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    needs: build
+    if: ${{ github.event.inputs.skip-qemu != 'true' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install QEMU and firmware
+        run: |
+          sudo apt-get update -qq
+          sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y \
+              qemu-system-x86 qemu-utils ovmf
+          ls -l /dev/kvm || echo "no /dev/kvm: the TCG fallback will be used (slower, still valid)"
+
+      - name: Download the ISO artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build.outputs.iso_name }}
+
+      - name: Run the firmware smoke tests
+        run: |
+          chmod +x test/qemu-smoke.sh
+          ./test/qemu-smoke.sh "${{ needs.build.outputs.iso_name }}" both
+
+      - name: Upload serial logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qemu-serial-logs-${{ github.run_id }}
+          path: artifacts/
+          if-no-files-found: ignore
+
+  release:
+    name: Attach the ISO to the tag release
+    runs-on: ubuntu-24.04
+    needs: [build, qemusmoke]
+    if: startsWith(github.ref, 'refs/tags/') && !cancelled() && needs.build.result == 'success' && needs.qemusmoke.result == 'success'
+
+    steps:
+      - name: Download the ISO artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build.outputs.iso_name }}
+
+      - name: Publish the release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            *.iso
+            *.sha256
+          generate_release_notes: true

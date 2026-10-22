@@ -1,0 +1,14 @@
+PRETTY_NAME="NexWM OS __VERSION__ (based on Ubuntu __VERSION__ LTS)"
+NAME="NexWM OS"
+VERSION_ID="__VERSION__"
+VERSION="__VERSION__ (NexWM OS)"
+VERSION_CODENAME=""
+ID=nexwmos
+ID_LIKE="debian ubuntu"
+PLATFORM_ID=""
+HOME_URL="https://github.com/Hyggshi-OS-Research-Technology/NexWM"
+BUILD_ID="nexwm-os"
+# HDE's About window parses os-release; exposing ubuntu keeps its
+# "Based on Ubuntu ..." line accurate.
+UBUNTU_CODENAME="__CODENAME__"
+DEFAULT_SESSION="nexwm"

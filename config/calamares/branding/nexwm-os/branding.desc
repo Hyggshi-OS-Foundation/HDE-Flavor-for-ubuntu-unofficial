@@ -1,0 +1,30 @@
+---
+componentName: nexwm-os
+
+windowExpanding:    fullscreen
+
+# URLs must be HTTPS or not set at all.
+strings:
+    productName:         NexWM OS
+    shortProductName:    NexWM OS
+    version:             "__VERSION__"
+    shortVersion:        "__CODENAME__"
+    versionedName:       NexWM OS
+    shortVersionedName:  NexWM OS __VERSION__
+    bootloaderEntryName: NexWM OS
+    productUrl:          https://github.com/Hyggshi-OS-Research-Technology/NexWM
+    supportUrl:          https://github.com/Hyggshi-OS-Research-Technology/NexWM/blob/main/README.md
+
+images:
+    productLogo:         "logo.png"
+    productIcon:         "logo.png"
+    productWelcome:      "welcome.png"
+
+slideshow:               "show.qml"
+
+slideshowAPI:            1
+
+style:
+   SidebarBackground:    "#171824"
+   SidebarText:          "#FFFFFF"
+   SidebarTextCurrent:   "#7C5CFF"

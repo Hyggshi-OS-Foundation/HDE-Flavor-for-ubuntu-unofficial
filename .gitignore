@@ -1,0 +1,12 @@
+# Build working directories (CI builds in /srv, maintainers may redirect)
+/srv/nexwm-os-build/
+.iso/
+out/
+logs/
+artifacts/
+*.iso
+*.sha256
+
+# Editor noise
+*.swp
+*~

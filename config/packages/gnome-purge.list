@@ -1,0 +1,57 @@
+# gnome-purge.list — GNOME packages removed from the rootfs before the live
+# system is assembled. NexWM OS is built from a minimal Ubuntu base, so GNOME
+# is normally never installed; this list is the safety net that guarantees no
+# GNOME desktop layer can leak into the flavor through a seed change or a
+# dependency of ubuntu-standard. Every line is checked before purging, so
+# packages that are not present are skipped silently.
+
+gdm3
+gnome-shell
+gnome-session
+gnome-session-bin
+ubuntu-desktop
+ubuntu-desktop-minimal
+ubuntu-session
+mutter
+mutter-common
+nautilus
+epiphany-browser
+eog
+evince
+gnome-calculator
+gnome-characters
+gnome-contacts
+gnome-control-center
+gnome-font-viewer
+gnome-logs
+gnome-menus
+gnome-power-manager
+gnome-screenshot
+gnome-software
+gnome-system-monitor
+gnome-terminal
+gnome-terminal-data
+gnome-text-editor
+gnome-tweaks
+gnome-user-docs
+gnome-user-docs-ubuntu
+gnome-backgrounds
+gnome-shell-extensions
+gnome-shell-extension-*
+yelp
+yelp-xsl
+totem
+rhythmbox
+shotwell
+baobab
+file-roller
+evolution-data-server
+gedit
+ibus
+ibus-gtk4
+gnome-bluetooth-3-common
+ubuntu-report
+whoopsie
+snapd
+snapd-glib
+ubuntu-advantage-tools

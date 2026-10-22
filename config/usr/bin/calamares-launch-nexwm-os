@@ -1,0 +1,48 @@
+#!/bin/bash
+# calamares-launch-nexwm-os — start the Calamares installer on the live
+# medium, the way Ubuntu flavors do: display environment intact, logs kept in
+# /var/log/installation, and a clear failure message instead of a silent exit.
+
+set -eu
+
+LOG_DIR=/var/log/installation
+mkdir -p "$LOG_DIR"
+exec >> "$LOG_DIR/calamares-launch.log" 2>&1
+
+echo "--- launch: $(date -Is) user=$(id -un) display=${DISPLAY:-unset} wayland=${WAYLAND_DISPLAY:-unset} ---"
+
+case ":$(id -un):" in
+    :root:) ;;
+    *)
+        # Passwordless sudo is the Ubuntu live-medium convention and keeps the
+        # X environment (DISPLAY + XAUTHORITY) intact; fall back to pkexec when
+        # DISPLAY is already working.
+        if [ -n "${DISPLAY:-}" ] || [ -n "${WAYLAND_DISPLAY:-}" ]; then
+            if command -v pkexec >/dev/null 2>&1 && [ -z "${SUDO_USER:-}" ]; then
+                exec pkexec exec /usr/bin/calamares-launch-nexwm-os
+            fi
+        fi
+        echo "no display environment: cannot open the installer" >&2
+        exit 1
+        ;;
+esac
+
+if ! command -v calamares >/dev/null 2>&1; then
+    echo "ERROR: calamares is not installed on this medium" >&2
+    exit 127
+fi
+
+# Give the window manager a moment; calamares needs a working display.
+if [ -n "${DISPLAY:-}" ]; then
+    for _ in 1 2 3 4 5; do
+        if xset -q >/dev/null 2>&1; then break; fi
+        sleep 1
+    done
+fi
+
+# -D8: start with debug logging so GitHub Actions artifacts are useful.
+if [ -n "${NEXWMOS_INSTALLER_DEBUG:-}" ]; then
+    exec calamares -D8 "$@"
+else
+    exec calamares "$@"
+fi

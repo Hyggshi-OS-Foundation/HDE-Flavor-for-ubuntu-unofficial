@@ -1,0 +1,55 @@
+#!/bin/bash
+# nexwm-os-live-check — smoke helper for the live ISO.
+#
+# Runs as a systemd service only on the live medium (ConditionKernelCommandLine
+# in the unit) and waits for the HDE desktop of the auto-logged-in user to be
+# fully up, then prints a machine-readable marker on the console. The QEMU
+# smoke test on GitHub Actions greps the serial console for exactly this
+# marker; when it (or the unit's timeout) is seen, QEMU is torn down and the
+# test passes or fails accordingly.
+
+set -u
+
+MARKER="NEXWMOS_SMOKE_OK"
+TIMEOUT="${NEXWMOS_SMOKE_TIMEOUT:-900}"
+
+announce() {
+    # Serial + journal + every tty the kernel knows about.
+    for dev in /dev/console /dev/tty0 /dev/ttyS0; do
+        [ -e "$dev" ] && echo "$*" >> "$dev" 2>/dev/null
+    done
+    logger -t nexwm-os-live-check "$*"
+}
+
+# Which user did casper create for this boot?
+LIVE_USER=""
+for source in /etc/casper.conf /run/casper.conf; do
+    if [ -f "$source" ] && grep -q '^USERNAME=' "$source"; then
+        LIVE_USER="$(sed -n 's/^USERNAME="\?\([^"]*\)"\?$/\1/p' "$source" | head -n 1)"
+        [ -n "$LIVE_USER" ] && break
+    fi
+done
+if [ -z "$LIVE_USER" ]; then
+    LIVE_USER="$(getent passwd '1000' | cut -d: -f1)"
+fi
+[ -n "$LIVE_USER" ] || LIVE_USER="ubuntu"
+echo "nexwm-os-live-check: watching for the desktop of user '$LIVE_USER'"
+
+start=$(date +%s)
+while :; do
+    if pgrep -u "$LIVE_USER" -f '(/usr/bin/)?hde-panel' >/dev/null 2>&1; then
+        announce "$MARKER"
+        sleep 10
+        announce "NEXWMOS_SMOKE_DONE"
+        systemd-detect-virt >/dev/null 2>&1 || true
+        systemctl poweroff --no-wall || poweroff -f
+        exit 0
+    fi
+    now=$(date +%s)
+    [ "$((now - start))" -ge "$TIMEOUT" ] && {
+        announce "NEXWMOS_SMOKE_TIMEOUT: desktop did not appear within ${TIMEOUT}s"
+        systemctl poweroff --no-wall || poweroff -f
+        exit 1
+    }
+    sleep 5
+done

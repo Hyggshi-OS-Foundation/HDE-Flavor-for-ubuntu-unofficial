@@ -1,0 +1,6 @@
+# installer.list — the Calamares installer and everything it needs on the
+# live ISO. Calamares on Ubuntu is Qt 6; its package dependencies (kpmcore,
+# Qt libraries, ...) are pulled automatically. Settings and branding are the
+# ones in config/calamares/, installed by scripts/50-installer.sh.
+
+calamares

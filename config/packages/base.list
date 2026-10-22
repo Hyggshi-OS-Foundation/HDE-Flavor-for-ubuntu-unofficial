@@ -1,0 +1,70 @@
+# base.list — packages installed in the rootfs before HDE is built.
+# One package name per line; "#" comments out the line.
+# HDE's own build script (packaging/hyggshi-os/build-nexwm.sh) installs its
+# build deps and the desktop runtime (metacity, udisks, labwc, ...); what is
+# listed below is everything else an Ubuntu flavor live system needs.
+
+# seeding / standard system (console + POSIX userland)
+ubuntu-standard
+locales
+python3
+systemd-sysv
+
+# kernel + live boot machinery
+casper
+linux-generic
+
+# GRUB on the target system (Calamares runs grub-install in the target)
+grub-pc
+grub-efi-amd64
+grub-efi-amd64-bin
+grub-efi-amd64-signed
+shim-signed
+os-prober
+
+# display manager (HDE ships an SDDM login theme: login/sddm)
+sddm
+
+# X stack
+xserver-xorg
+xserver-xorg-video-all
+xserver-xorg-input-all
+x11-xserver-utils
+xauth
+
+# sound (PipeWire, which HDE's volume OSD and media keys talk to)
+pipewire
+pipewire-pulse
+pipewire-audio
+wireplumber
+
+# themes and fonts (Yaru = Ubuntu's own theme; HDE picks the GTK theme's
+# accent colour for its panel and menus, "Automatic" by default)
+yaru-theme-gtk
+yaru-theme-icon
+adwaita-icon-theme
+gnome-themes-extra
+librsvg2-common
+fonts-ubuntu
+fonts-noto-core
+fonts-noto-color-emoji
+fonts-dejavu-core
+
+# desktop infrastructure
+network-manager
+bluez
+udisks2
+gnome-keyring
+policykit-1-gnome
+xdg-user-dirs
+xdg-utils
+gvfs
+gvfs-backends
+gvfs-fuse
+xdg-desktop-portal-gtk
+rsync
+apt-utils
+ca-certificates
+
+# not essential, but keeps add/remove and PPA flows working like other flavors
+software-properties-common

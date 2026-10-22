@@ -1,0 +1,19 @@
+[Unit]
+Description=NexWM OS live session autologin (casper only)
+Documentation=https://github.com/Hyggshi-OS-Research-Technology/NexWM
+# Only exists to make SDDM log the live user straight into the desktop on the
+# live medium. On installed systems Calamares strips this unit before first
+# boot, so no automatic login can ever happen there.
+ConditionKernelCommandLine=boot=casper
+# casper writes /etc/casper.conf after its initramfs phase; ordering against
+# the display-manager daemon ensures the file below is written in time.
+After=systemd-user-sessions.service
+Before=display-manager.service sddm.service
+DefaultDependencies=no
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/nexwm-os/live-autologin
+
+[Install]
+WantedBy=multi-user.target
