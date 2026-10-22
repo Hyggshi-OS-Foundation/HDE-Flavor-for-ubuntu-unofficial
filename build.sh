@@ -186,7 +186,7 @@ say "host stage 71: squashfs"
 bash "$REPO_DIR/scripts/stages/70-squashfs.sh" 2>&1 | tee "$LOG_DIR/70-squashfs.log"
 
 say "host stage 80: bootloaders + xorriso"
-export ISO_NAME="nexwm-os-$BASE_VERSION-desktop-amd64.iso"
+export ISO_NAME="nexwm-os-$BASE_VERSION-desktop-amd64.iso" ISO_OUT_DIR="$OUT_DIR"
 bash "$REPO_DIR/scripts/stages/80-iso.sh" 2>&1 | tee "$LOG_DIR/80-iso.log"
 
 say "host stage 90: preflight checks"
