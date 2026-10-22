@@ -3,9 +3,9 @@
 
 BUILD_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-say()  { printf '\n===== %s =====\n' "$*"; }
-step() { printf '----- %s\n' "$*"; }
-die()  { printf '\nFATAL: %s\n' "$*" >&2; exit 1; }
+say()  { printf '%s\n' "===== $* ====="; }
+step() { printf '%s\n' "----- $*"; }
+die()  { printf '%s\n' "FATAL: $*" >&2; exit 1; }
 
 need_cmd() {
     command -v "$1" >/dev/null 2>&1 || die "required command '$1' is missing; install it and re-run"

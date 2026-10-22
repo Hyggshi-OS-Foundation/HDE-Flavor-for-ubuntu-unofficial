@@ -72,7 +72,7 @@ jobs:
         with:
           name: build-logs-${{ github.run_id }}
           path: ${{ env.WORKDIR }}/logs
-          if-no-files-found: error
+          if-no-files-found: warn
 
       - name: Identify the built ISO
         id: iso
