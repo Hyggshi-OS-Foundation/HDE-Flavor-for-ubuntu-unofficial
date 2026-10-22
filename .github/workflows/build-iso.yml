@@ -67,12 +67,17 @@ jobs:
                    bash build.sh --fresh
 
       - name: Capture stage logs
-        if: always()
+        # The ISO-adjacent diagnostics are useful when the build fails, but
+        # they must never be able to fail the run themselves (e.g. when the
+        # Actions artifact storage quota is exhausted).
+        if: failure()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: build-logs-${{ github.run_id }}
-          path: ${{ env.WORKDIR }}/logs
-          if-no-files-found: warn
+          path: ${{ env.WORKDIR }}/logs/*
+          retention-days: 7
+          if-no-files-found: ignore
 
       - name: Identify the built ISO
         id: iso
@@ -81,16 +86,24 @@ jobs:
           iso_path=$(ls -1 "$WORKDIR"/out/*.iso | head -n1)
           echo "name=$(basename "$iso_path")" >> "$GITHUB_OUTPUT"
 
-      - name: Upload the ISO
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ steps.iso.outputs.name }}
-          path: |
-            ${{ env.WORKDIR }}/out/*.iso
-            ${{ env.WORKDIR }}/out/*.sha256
-          retention-days: 14
-          if-no-files-found: error
-          compression-level: 0
+      # ISOs are far larger than any private-repo artifact allowance, so they
+      # travel through a rolling "nightly" RELEASE instead of Actions
+      # artifacts: release assets do not count against the Actions storage
+      # quota. The QEMU job and (on tags) the real release download it back
+      # from here.
+      - name: Publish the ISO to the rolling nightly release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISO_NAME: ${{ steps.iso.outputs.name }}
+        run: |
+          cd "$WORKDIR/out"
+          gh release delete nightly --yes --cleanup-tag || true
+          gh release create nightly \
+              --target "$GITHUB_SHA" \
+              --title "NexWM OS nightly" \
+              --notes "Automated development build of commit $GITHUB_SHA. Pre-release: the QEMU firmware smoke tests have not run for this ISO yet." \
+              --prerelease
+          gh release upload nightly "$ISO_NAME" "$ISO_NAME.sha256"
 
   qemusmoke:
     name: QEMU smoke (BIOS + UEFI)
@@ -109,10 +122,14 @@ jobs:
               qemu-system-x86 qemu-utils ovmf
           ls -l /dev/kvm || echo "no /dev/kvm: the TCG fallback will be used (slower, still valid)"
 
-      - name: Download the ISO artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: ${{ needs.build.outputs.iso_name }}
+      - name: Download the ISO from the nightly release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release download nightly --pattern "*.iso"
+          gh release download nightly --pattern "*.sha256"
+          ls -l
 
       - name: Run the firmware smoke tests
         run: |
@@ -120,11 +137,13 @@ jobs:
           ./test/qemu-smoke.sh "${{ needs.build.outputs.iso_name }}" both
 
       - name: Upload serial logs
-        if: always()
+        if: failure()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: qemu-serial-logs-${{ github.run_id }}
-          path: artifacts/
+          path: artifacts/*
+          retention-days: 7
           if-no-files-found: ignore
 
   release:
@@ -134,10 +153,13 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/') && !cancelled() && needs.build.result == 'success' && needs.qemusmoke.result == 'success'
 
     steps:
-      - name: Download the ISO artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: ${{ needs.build.outputs.iso_name }}
+      - name: Download the ISO from the nightly release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release download nightly --pattern "*.iso"
+          gh release download nightly --pattern "*.sha256"
 
       - name: Publish the release
         uses: softprops/action-gh-release@v2

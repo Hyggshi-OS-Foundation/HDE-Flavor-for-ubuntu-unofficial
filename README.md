@@ -57,7 +57,7 @@ Everything runs on hosted `ubuntu-24.04` runners —
    `nexwm-os-live-check` unit reports `NEXWMOS_SMOKE_OK` on the serial
    console once the live desktop is genuinely up, then powers the machine
    off. `test/qemu-smoke.sh` greps the firmware path's serial log for the
-   marker; logs are always uploaded as artifacts.
+   marker; logs from failed runs are uploaded as best-effort artifacts.
 
 Build stages, each reviewable in its own file under `scripts/stages/`:
 
