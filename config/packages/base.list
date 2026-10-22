@@ -14,8 +14,10 @@ systemd-sysv
 casper
 linux-generic
 
-# GRUB on the target system (Calamares runs grub-install in the target)
-grub-pc
+# GRUB for the live medium and EFI boot. grub-pc must NOT be in the same
+# chroot as grub-efi-amd64 (hard Conflicts in the archive); Calamares installs
+# grub-pc or grub-efi-amd64 into the *installed target* as appropriate, so
+# BIOS-boot installs still work without grub-pc on the live image.
 grub-efi-amd64
 grub-efi-amd64-bin
 grub-efi-amd64-signed
