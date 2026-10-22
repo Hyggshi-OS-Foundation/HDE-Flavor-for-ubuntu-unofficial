@@ -10,6 +10,21 @@ set -euo pipefail
 ensure_flavor_config
 
 SRC_IN_CHROOT="${SRC_IN_CHROOT:-/tmp/nexwm-src}"
+
+step "apply the pinned-source patches carried by this repo"
+# patches/ documents *why* each pinned-source change exists. They stay here
+# until the fix lands in the upstream repository and the pinned ref picks it
+# up; `patch --forward` is a no-op once the upstream source already has the
+# change.
+for p in /repo/patches/*.patch; do
+    [ -e "$p" ] || continue
+    if patch --forward -d "$SRC_IN_CHROOT" -p1 < "$p"; then
+        echo "applied $(basename "$p")"
+    else
+        echo "WARNING: $(basename "$p") did not apply cleanly" >&2
+    fi
+done
+
 BUILD_SCRIPT="$SRC_IN_CHROOT/$HDE_BUILD_SCRIPT"
 
 [ -f "$BUILD_SCRIPT" ] || die "HDE build script not found at $BUILD_SCRIPT (the orchestrator copies the checkout into the chroot)"

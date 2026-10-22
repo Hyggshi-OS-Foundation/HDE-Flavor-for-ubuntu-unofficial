@@ -1,0 +1,47 @@
+From 10ef0d6581f3fa305acd332a55df3c313632c720 Mon Sep 17 00:00:00 2001
+From: Hyggshi OS Research & Technology <ci@hyggshi-os.invalid>
+Date: Thu, 22 Oct 2026 16:53:55 +0700
+Subject: [PATCH] SDDM installer: offer the NexWM (Wayland) session only when
+ it was built
+
+login/sddm/install.sh reinstalled /usr/share/wayland-sessions/nexwm-wayland.desktop
+unconditionally, resurrecting an entry make install had just removed on builds
+without a wlroots compositor (wlroots < 0.18). That broke check-install: /usr contains every required program; session metadata matches the built features
+('the NexWM Wayland session was installed without a wlroots compositor') and
+would present a session that cannot start on the login screen.
+
+Ask the installed binary itself: nexwm --help reports
+'Wayland compositor (wlroots): yes' exactly when NEXWM_HAVE_WLROOTS was
+compiled in, so gate on that.
+---
+ login/sddm/install.sh | 14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
+
+diff --git a/login/sddm/install.sh b/login/sddm/install.sh
+index cee9b27..31447a1 100755
+--- a/login/sddm/install.sh
++++ b/login/sddm/install.sh
+@@ -227,7 +227,19 @@ ${SESSION_LINE}EOF"
+             sed "s|@PREFIX@|$PREF|g" "$DATA_DIR/hde-wayland.desktop" > /usr/share/wayland-sessions/hde-wayland.desktop
+             rm -f /usr/share/xsessions/hde-wayland.desktop 2>/dev/null || true
+             [ -f "$DATA_DIR/nexwm.desktop" ] && sed "s|@PREFIX@|$PREF|g" "$DATA_DIR/nexwm.desktop" > /usr/share/xsessions/nexwm.desktop
+-            [ -f "$DATA_DIR/nexwm-wayland.desktop" ] && sed "s|@PREFIX@|$PREF|g" "$DATA_DIR/nexwm-wayland.desktop" > /usr/share/wayland-sessions/nexwm-wayland.desktop
++            # "NexWM (Wayland)" is nexwm's own wlroots compositor session. It may only be
++            # offered when the installed nexwm binary actually has that half built in
++            # (the Makefile requires wlroots >= 0.18); otherwise make install has just
++            # removed the entry and this script must not resurrect it, or a checkout
++            # like make check-install flags the mismatch (and the login screen would
++            # offer a session that cannot start).
++            if [ -f "$DATA_DIR/nexwm-wayland.desktop" ]; then
++                if [ -x "$PREF/bin/nexwm" ] && "$PREF/bin/nexwm" --help 2>/dev/null | grep -q "^Wayland compositor (wlroots): yes"; then
++                    sed "s|@PREFIX@|$PREF|g" "$DATA_DIR/nexwm-wayland.desktop" > /usr/share/wayland-sessions/nexwm-wayland.desktop
++                else
++                    rm -f /usr/share/wayland-sessions/nexwm-wayland.desktop 2>/dev/null || true
++                fi
++            fi
+             chmod 644 /usr/share/xsessions/hde.desktop /usr/share/wayland-sessions/hde-wayland.desktop 2>/dev/null || true
+             say "  sessions:   installed HDE (X11) and HDE (Wayland) into /usr/share/{xsessions,wayland-sessions}"
+         fi
+-- 
+2.53.0
+
