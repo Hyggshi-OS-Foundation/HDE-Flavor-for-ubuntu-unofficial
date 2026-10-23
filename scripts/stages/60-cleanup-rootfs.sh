@@ -13,16 +13,26 @@ rm -f /usr/sbin/policy-rc.d
 # tries to remove it and sudo's own pre-removal script refuses, which halts
 # dpkg half-way through the -dev purge. Mark it (and the live runtime it
 # serves) as wanted before purging.
-apt-mark manual sudo 2>/dev/null || true
 # Compiler toolchain leftovers from the HDE build (-dev packages have no
-# runtime role in an installed desktop system).
+# runtime role in an installed desktop system). NOTE: this purge once dragged
+# the live runtime down with it (the apt-marks evidence proved casper, sddm
+# and network-manager were already gone before the mark step ran), so every
+# wanted package is marked manual BEFORE the purge and a verify comes right
+# after it, before autoremove gets a chance.
+apt-mark manual casper sddm metacity network-manager linux-generic \
+    linux-image-generic sudo 2>/dev/null || true
 apt-get purge -y --allow-remove-essential \
     $(dpkg-query -W -f='${binary:Package}\n' | grep -E '(-dev|-dbg)$') 2>/dev/null || true
+
+step "verify the live runtime survived the -dev purge"
+# If the purge took casper/sddm/network-manager with it, this names it HERE
+# instead of blaming autoremove two steps later.
+verify_live_packages
 
 step "protect the live runtime before autoremove"
 # casper, the display manager, the desktop and the network stack were all
 # installed manually by earlier stages, but marks can be rewritten when
-# dependency graphs change under the -dev purge above: state it explicitly so
+# dependency graphs change under the purges: state it explicitly so
 # autoremove keeps them.
 apt-mark manual casper sddm metacity network-manager linux-generic \
     linux-image-generic 2>/dev/null || true
