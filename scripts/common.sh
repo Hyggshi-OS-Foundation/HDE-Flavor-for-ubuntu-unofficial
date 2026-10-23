@@ -39,11 +39,21 @@ safe_purge_dev_packages() {
         | awk '$1 == "installed" { print $2 }' | grep -E -e '-(dev|dbg)(:[a-z0-9]+)?$' || true)
     [ "${#cands[@]}" -gt 0 ] || { echo "no -dev/-dbg packages installed"; return 0; }
 
-    # collateral = names in an apt plan that are not -dev/-dbg packages
-    _collateral() { printf '%s\n' "$1" | awk '/^Remv /{ n=$2; sub(/:.*/,"",n); print n }' | grep -Ev -e "$re" || true; }
+    # collateral = names in an apt plan that are not -dev/-dbg packages.
+    # `apt-get -s purge` prints "Purg <pkg>" lines ("Remv" for plain remove),
+    # so both prefixes must be read. Runtime packages named in the plan always
+    # count as collateral, whatever the prefix.
+    _collateral() {
+        printf '%s\n' "$1" | awk '/^(Remv|Purg) /{ n=$2; sub(/:.*/,"",n); print n }' \
+            | grep -Ev -e "$re" || true
+    }
+    _plan_ok() {   # $1 = plan text; fail if apt printed no plan at all
+        printf '%s\n' "$1" | grep -qE '^(Remv|Purg) ' || return 1
+    }
 
     step "simulate purging all ${#cands[@]} -dev/-dbg packages together"
     plan=$(apt-get -s purge --allow-remove-essential "${cands[@]}" 2>&1) || true
+    _plan_ok "$plan" || { printf '%s\n' "$plan" >&2; die "apt simulation produced no Remv/Purg lines; refusing to purge blind"; }
     bad=$(_collateral "$plan")
     if [ -z "$bad" ]; then
         safe=("${cands[@]}")
@@ -61,6 +71,7 @@ safe_purge_dev_packages() {
     # Final check on the exact set we are about to purge (independent removals
     # can still interact), then purge for real with output visible.
     plan=$(apt-get -s purge --allow-remove-essential "${safe[@]}" 2>&1) || true
+    _plan_ok "$plan" || { printf '%s\n' "$plan" >&2; die "final apt simulation produced no plan; refusing to purge blind"; }
     bad=$(_collateral "$plan")
     [ -z "$bad" ] || die "safe -dev set still removes non-dev packages: $(echo $bad | tr '\n' ' ')"
 
