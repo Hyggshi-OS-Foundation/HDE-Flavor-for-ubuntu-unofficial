@@ -126,6 +126,9 @@ jobs:
       - name: Publish the ISO to the rolling nightly release
         env:
           GH_TOKEN: ${{ github.token }}
+          # The ISO lives in $WORKDIR/out, which is not a git checkout, so gh
+          # cannot infer the repository from the working directory.
+          GH_REPO: ${{ github.repository }}
           ISO_NAME: ${{ steps.iso.outputs.name }}
         run: |
           cd "$WORKDIR/out"
@@ -135,7 +138,7 @@ jobs:
               --title "NexWM OS nightly" \
               --notes "Automated development build of commit $GITHUB_SHA. Pre-release: the QEMU firmware smoke tests have not run for this ISO yet." \
               --prerelease
-          gh release upload nightly "$ISO_NAME" "$ISO_NAME.sha256"
+          gh release upload nightly "$ISO_NAME" "$ISO_NAME.sha256" --clobber
 
   qemusmoke:
     name: QEMU smoke (BIOS + UEFI)
