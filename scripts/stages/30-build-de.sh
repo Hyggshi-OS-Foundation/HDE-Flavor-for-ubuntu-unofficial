@@ -33,6 +33,8 @@ export HDE_RUNTIME=full                   # network/volume/power features on
 export DEBUG_MODE=true                    # verbose in the CI log
 bash "$BUILD_SCRIPT"
 
+verify_live_packages
+
 step "verify the sessions a login screen sees"
 ls -1 /usr/share/xsessions/
 [ -f /usr/share/xsessions/hde.desktop ] || die "hde.desktop session missing"

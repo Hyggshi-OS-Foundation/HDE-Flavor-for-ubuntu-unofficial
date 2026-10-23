@@ -30,4 +30,5 @@ apt-get autoremove -y --purge >/dev/null
 apt-get clean
 
 step "result: purged=[$([ -n "$purged" ] && echo "$purged" || echo none)] skipped-present=$([ -n "$skipped" ] && echo yes || echo no)"
+verify_live_packages
 echo "25-remove-gnome.sh done"

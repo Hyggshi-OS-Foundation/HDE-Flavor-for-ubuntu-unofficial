@@ -46,4 +46,6 @@ step "enable the display manager (SDDM) for the live medium"
 systemctl enable sddm.service 2>/dev/null || \
     ln -sf /lib/systemd/system/sddm.service /etc/systemd/system/display-manager.service
 
+verify_live_packages
+
 echo "20-install-base.sh done"

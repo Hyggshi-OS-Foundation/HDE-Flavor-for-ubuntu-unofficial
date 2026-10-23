@@ -11,6 +11,19 @@ need_cmd() {
     command -v "$1" >/dev/null 2>&1 || die "required command '$1' is missing; install it and re-run"
 }
 
+# Chroot stages call this after any step that removes or reconfigures
+# packages: if one of the packages the live session honestly needs is gone,
+# fail here with the stage's name in the log instead of at the QEMU boot or
+# the manifest check, where the cause is two stages away and untraceable.
+verify_live_packages() {
+    local missing=""
+    for p in casper sddm metacity network-manager linux-image-generic; do
+        dpkg-query -W -f='${db:Status-Status} ${binary:Package}\n' "$p" 2>/dev/null \
+            | grep -qx "installed $p" || missing="$missing $p"
+    done
+    [ -z "$missing" ] || die "live-runtime packages missing after this stage:$missing"
+}
+
 # Load config values (flavor.conf) unless the caller already did.
 ensure_flavor_config() {
     # shellcheck disable=SC1091

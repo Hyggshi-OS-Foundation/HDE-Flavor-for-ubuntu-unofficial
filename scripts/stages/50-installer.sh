@@ -44,4 +44,5 @@ grep -q "^branding: nexwm-os$" /etc/calamares/settings.conf || die "branding com
 # from the live sources), so try_install has somewhere to download from.
 [ -f /etc/apt/sources.list ] || die "apt sources missing for the packages module"
 
+verify_live_packages
 echo "50-installer.sh done"

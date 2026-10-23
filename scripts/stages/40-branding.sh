@@ -77,4 +77,5 @@ ln -sf /etc/systemd/system/nexwm-os-live-check.service \
     /etc/systemd/system/graphical.target.wants/nexwm-os-live-check.service
 
 # netboot friendly: casper writes history; keep that default and nothing else.
+verify_live_packages
 echo "40-branding.sh done"

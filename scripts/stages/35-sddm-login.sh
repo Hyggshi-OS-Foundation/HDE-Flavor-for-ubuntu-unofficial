@@ -12,6 +12,7 @@ SRC_IN_CHROOT="${SRC_IN_CHROOT:-/tmp/nexwm-src}"
 step "install the HDE SDDM theme"
 bash "$SRC_IN_CHROOT/login/sddm/install.sh"
 
-[ -d /usr/share/sddm/themes/hde ] || die "HDE SDDM theme not installed"
+if ! [ -d /usr/share/sddm/themes/hde ]; then die "HDE SDDM theme not installed"; fi
 
+verify_live_packages
 echo "35-sddm-login.sh done"
