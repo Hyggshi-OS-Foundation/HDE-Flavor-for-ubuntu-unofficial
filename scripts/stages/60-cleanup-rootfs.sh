@@ -26,6 +26,17 @@ step "protect the live runtime before autoremove"
 # autoremove keeps them.
 apt-mark manual casper sddm metacity network-manager linux-generic \
     linux-image-generic 2>/dev/null || true
+
+step "autoremove plan preflight"
+# autoremove has removed live-runtime packages before; ask it for its plan
+# first and refuse to run it when it lists any of the packages the live
+# system needs. The printed plan also documents HOW apt came to see them as
+# removable (orphan dependency). It names every entry and halts.
+PLAN=$(apt-get --assume-no autoremove --purge 2>/dev/null || true)
+if printf '%s\n' "$PLAN" | grep -qE '\b(casper|sddm|network-manager|metacity|linux-image-generic)\b'; then
+    printf '%s\n' "$PLAN" | grep -E 'REMOV|casper|sddm|network-manager|metacity|linux-image' | head -n 20 >&2
+    die "autoremove is planning to remove live-runtime packages (see the plan above)"
+fi
 apt-get autoremove -y --purge || true
 
 step "verify the live runtime survived the cleanup"
