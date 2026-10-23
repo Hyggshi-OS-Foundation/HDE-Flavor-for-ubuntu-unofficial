@@ -178,7 +178,7 @@ echo "$(du -sh "$APT_CACHE_DIR" | cut -f1) of apt packages cached before evictio
 # run. Evict whole files oldest-first while the cache exceeds 5 GiB instead,
 # which keeps the commonly reused recent packages and stays under the
 # repository's cache allowance with room to spare.
-while [ "$(du -sBM --apparent-size "$APT_CACHE_DIR" | cut -f1)" -gt 5000 ]; do
+while [ "$(du -sm "$APT_CACHE_DIR" 2>/dev/null | cut -f1)" -gt 5000 ]; do
     oldest=$(find "$APT_CACHE_DIR" -name '*.deb' -type f -printf '%T@ %p\n' | sort -n | head -n 1 | cut -d' ' -f2-)
     [ -n "$oldest" ] || break
     rm -f "$oldest"

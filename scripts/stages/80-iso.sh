@@ -90,6 +90,10 @@ grub-mkstandalone \
 step "pack the ESP image efi.img (mtools, no loop mount needed)"
 ESP_SIZE=$(( ( ($(du -sk "$ISO_STAGE/EFI/BOOT" | cut -f1) + 2048) / 32 ) * 32 ))
 mkfs.vfat -n EFI -C "$ISO_STAGE/efi.img" "$ESP_SIZE" >/dev/null
+# mtools does not create intermediate directories: make the ESP layout first,
+# then copy the bootloader in place (a UEFI firmware looks for the fallback
+# path /EFI/BOOT/BOOTX64.EFI on ESP-formatted media).
+mmd -i "$ISO_STAGE/efi.img" ::/EFI ::/EFI/BOOT
 mcopy -i "$ISO_STAGE/efi.img" -s "$ISO_STAGE/EFI/BOOT/." ::/EFI/BOOT/ >/dev/null
 mdir -i "$ISO_STAGE/efi.img" ::/EFI/BOOT/
 
