@@ -59,6 +59,7 @@ fonts-dejavu-core
 network-manager
 bluez
 udisks2
+metacity
 gnome-keyring
 policykit-1-gnome
 xdg-user-dirs

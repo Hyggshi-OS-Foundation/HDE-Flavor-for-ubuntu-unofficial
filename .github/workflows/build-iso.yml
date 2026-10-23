@@ -97,8 +97,16 @@ jobs:
           if-no-files-found: ignore
 
       - name: Save the APT package cache
+        # apt (root, through the chroot bind) leaves a root-owned lock file
+        # and a partial dir inside the cache; the tar of the save action runs
+        # as the runner user and cannot read them. Tidy first. This also
+        # covers builds that die before the build script's own eviction.
         if: always()
-        uses: actions/cache/save@v4
+        run: |
+          sudo rm -f "${{ env.WORKDIR }}/apt-cache/lock"
+          sudo rm -rf "${{ env.WORKDIR }}/apt-cache/partial"
+          sudo chmod -R a+rX "${{ env.WORKDIR }}/apt-cache" || true
+      - uses: actions/cache/save@v4
         with:
           path: ${{ env.WORKDIR }}/apt-cache
           key: apt-${{ runner.os }}-${{ github.event.inputs.base-suite || 'noble-default' }}-v1
