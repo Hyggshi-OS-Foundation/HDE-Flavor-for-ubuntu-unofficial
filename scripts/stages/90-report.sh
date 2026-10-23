@@ -51,13 +51,14 @@ for pkg in casper sddm metacity network-manager linux-image; do
 done
 
 step "HDE binaries are inside the squashfs"
-# List the image ONCE into a file and grep the file. Piping unsquashfs into
-# `grep -q` under pipefail is a false-negative generator: grep exits at the
-# first match, unsquashfs dies of SIGPIPE (141) on the huge listing, and the
-# pipeline is reported as failed even though the file is present.
+# List the image ONCE into a file and grep the file (a `| grep -q` pipeline
+# under pipefail can also fail spuriously via SIGPIPE). NOTE: squashfs-tools
+# 4.6.x has no `-list` option (older releases accepted it as an abbreviation);
+# it prints its usage text and exits non-zero. The valid spelling is `-ls`
+# (`-l` is the same). Errors are kept visible, not sent to /dev/null.
 SQUASH_LIST="$BUILD_LOG_DIR/squashfs-list.txt"
-unsquashfs -list "$ISO_STAGE/casper/filesystem.squashfs" > "$SQUASH_LIST" 2>"$BUILD_LOG_DIR/unsquashfs.err" \
-    || { cat "$BUILD_LOG_DIR/unsquashfs.err" >&2; die "unsquashfs could not list the image"; }
+unsquashfs -no-progress -ls "$ISO_STAGE/casper/filesystem.squashfs" > "$SQUASH_LIST" 2>"$BUILD_LOG_DIR/unsquashfs.err" \
+    || { head -n 5 "$BUILD_LOG_DIR/unsquashfs.err" >&2; die "unsquashfs could not list the image"; }
 [ -s "$SQUASH_LIST" ] || die "unsquashfs produced an empty listing"
 
 check_squash() {   # $1 = ERE, $2 = human name
