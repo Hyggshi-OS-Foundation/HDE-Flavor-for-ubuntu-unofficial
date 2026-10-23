@@ -18,7 +18,32 @@ apt-mark manual sudo 2>/dev/null || true
 # runtime role in an installed desktop system).
 apt-get purge -y --allow-remove-essential \
     $(dpkg-query -W -f='${binary:Package}\n' | grep -E '(-dev|-dbg)$') 2>/dev/null || true
+
+step "protect the live runtime before autoremove"
+# casper, the display manager, the desktop and the network stack were all
+# installed manually by earlier stages, but marks can be rewritten when
+# dependency graphs change under the -dev purge above: state it explicitly so
+# autoremove keeps them.
+apt-mark manual casper sddm metacity network-manager linux-generic \
+    linux-image-generic 2>/dev/null || true
 apt-get autoremove -y --purge || true
+
+step "verify the live runtime survived the cleanup"
+# A purged casper, display manager or network manager turns the build into an
+# ISO that boots to no session and cannot install anything:
+# before anything continues down the pipeline, name every entry and halt.
+MISSING=""
+for p in casper sddm metacity network-manager linux-image-generic; do
+    if ! dpkg-query -W -f='${Status}\t${binary:Package}\n' "$p" 2>/dev/null | grep -q " install ok installed"; then
+        MISSING="$MISSING $p"
+    fi
+done
+if [ -n "$MISSING" ]; then
+    echo "missing after cleanup:$MISSING; dpkg state:" >&2
+    dpkg-query -W -f='${binary:Package}\t${Status}\n' 2>/dev/null \
+        | grep -E "^(casper|sddm|metacity|network-manager|linux-image)" | head -n 20 >&2 || true
+    die "the cleanup stage removed live-runtime packages:$MISSING"
+fi
 rm -rf /var/lib/apt/lists/*
 # NOTE: the apt archives dir is bind-mounted to the CI-shared cache while the
 # chroot stages run; build.sh unmounts it and empties the chroot-side copy

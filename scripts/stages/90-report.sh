@@ -38,9 +38,16 @@ done
 
 step "casper metadata (installed packages)"
 [ -s "$ISO_STAGE/casper/filesystem.manifest" ] || die "filesystem.manifest is empty"
+check_manifest_pkg() {
+    local pkg="$1"
+    if ! grep -qE "^${pkg}[0-9.a-zA-Z-]* " "$ISO_STAGE/casper/filesystem.manifest"; then
+        echo "manifest entries starting with '${pkg:0:4}' (diagnostic):" >&2
+        grep -E "^${pkg:0:4}" "$ISO_STAGE/casper/filesystem.manifest" | head -n 10 >&2 || echo "  (none)" >&2
+        die "expected package '$pkg*' missing from filesystem.manifest"
+    fi
+}
 for pkg in casper sddm metacity network-manager linux-image; do
-    grep -qE "^${pkg}[0-9.a-zA-Z-]* " "$ISO_STAGE/casper/filesystem.manifest" \
-        || die "expected package '$pkg*' missing from filesystem.manifest"
+    check_manifest_pkg "$pkg"
 done
 
 step "HDE binaries are inside the squashfs"
