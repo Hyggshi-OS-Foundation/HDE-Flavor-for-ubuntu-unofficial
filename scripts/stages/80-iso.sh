@@ -103,7 +103,6 @@ step "md5 checksums of the staged tree (casper integrity check)"
 
 step "xorriso: single hybrid ISO (BIOS + UEFI, CD + USB)"
 xorriso -as mkisofs \
-    -noCache \
     -joliet-long -r -J \
     -V "$FLAVOR_ISO_LABEL" \
     -isohybrid-mbr "$MBR" \

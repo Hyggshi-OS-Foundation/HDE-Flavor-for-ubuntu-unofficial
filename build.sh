@@ -100,7 +100,7 @@ cat "$WORK_DIR/hde-provenance.txt"
 say "stage 10: debootstrap"
 bash "$REPO_DIR/scripts/stages/10-bootstrap-rootfs.sh" 2>&1 | tee "$LOG_DIR/10-bootstrap.log"
 
-BASE_VERSION="$(sed -n 's|^VERSION_ID="*\(.*\)"*$|\1|p' "$ROOTFS/etc/os-release" | head -n1)"
+BASE_VERSION="$(sed -n 's/^VERSION_ID=\"\{0,1\}\([^\"]*\)\"\{0,1\}$/\1/p' "$ROOTFS/etc/os-release" | head -n1)"
 export BASE_VERSION
 [ -n "$BASE_VERSION" ] || die "could not read VERSION_ID from the debootstrapped /etc/os-release"
 say "base version: Ubuntu $BASE_VERSION ($BASE_SUITE)"
@@ -184,6 +184,11 @@ while [ "$(du -sm "$APT_CACHE_DIR" 2>/dev/null | cut -f1)" -gt 5000 ]; do
     rm -f "$oldest"
 done
 echo "$(du -sh "$APT_CACHE_DIR" | cut -f1) of apt packages cached for the next run"
+# Make the shared bundle stashable by the CI runner user: apt (run as root
+# through the chroot bind) leaves a root-owned lock file and partial dir,
+# and the cache/save tar cannot read them.
+rm -rf "$APT_CACHE_DIR/lock" "$APT_CACHE_DIR/partial"
+chmod -R a+rX "$APT_CACHE_DIR"
 
 # ---------------------------------------------------------------------------
 # Teardown, then host stages 70..90.
