@@ -43,6 +43,9 @@ mkdir -p "$ISO_STAGE/isolinux" "$ISO_STAGE/EFI/BOOT"
 cp "$ISOLINUX_BIN" "$ISO_STAGE/isolinux/isolinux.bin"
 cp "$LDLINUX"      "$ISO_STAGE/isolinux/ldlinux.c32"
 
+# The LAST console= on the command line becomes /dev/console, i.e. where the
+# initramfs scripts (casper) print. ttyS0 therefore goes last so that CI's
+# serial log shows casper's messages; kernel messages still go to both.
 step "isolinux.cfg (BIOS path, serial console included for CI visibility)"
 cat > "$ISO_STAGE/isolinux/isolinux.cfg" <<'CFG'
 SERIAL 0 115200
@@ -53,12 +56,12 @@ PROMPT 0
 LABEL genmenu
   MENU LABEL NexWM OS
   KERNEL /casper/vmlinuz
-  APPEND initrd=/casper/initrd boot=casper console=ttyS0,115200 console=tty0
+  APPEND initrd=/casper/initrd boot=casper console=tty0 console=ttyS0,115200
 
 LABEL safe
   MENU LABEL NexWM OS (safe graphics)
   KERNEL /casper/vmlinuz
-  APPEND initrd=/casper/initrd boot=casper console=ttyS0,115200 console=tty0 nomodeset
+  APPEND initrd=/casper/initrd boot=casper console=tty0 console=ttyS0,115200 nomodeset
 CFG
 
 step "grub.cfg used by the standalone UEFI image"
@@ -68,13 +71,13 @@ set default=0
 
 menuentry 'NexWM OS (live)' --id live {
     search --no-floppy --label --set=root "NEXWMOS"
-    linux /casper/vmlinuz boot=casper console=ttyS0,115200 console=tty0
+    linux /casper/vmlinuz boot=casper console=tty0 console=ttyS0,115200
     initrd /casper/initrd
 }
 
 menuentry 'NexWM OS (safe graphics)' --id safe {
     search --no-floppy --label --set=root "NEXWMOS"
-    linux /casper/vmlinuz boot=casper console=ttyS0,115200 console=tty0 nomodeset
+    linux /casper/vmlinuz boot=casper console=tty0 console=ttyS0,115200 nomodeset
     initrd /casper/initrd
 }
 CFG

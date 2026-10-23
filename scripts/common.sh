@@ -17,10 +17,11 @@ need_cmd() {
 # the manifest check, where the cause is two stages away and untraceable.
 verify_live_packages() {
     local missing=""
-    for p in casper sddm metacity network-manager linux-image-generic; do
+    for p in casper sddm metacity network-manager linux-image-generic systemd systemd-sysv udev dbus initramfs-tools; do
         dpkg-query -W -f='${db:Status-Status} ${binary:Package}\n' "$p" 2>/dev/null \
             | grep -qx "installed $p" || missing="$missing $p"
     done
+    [ -e /sbin/init ] || missing="$missing /sbin/init(no init: initramfs would panic)"
     [ -z "$missing" ] || die "live-runtime packages missing after this stage:$missing (apt marks these as manually installed: $(apt-mark showmanual 2>/dev/null | grep -E '^(casper|sddm|network-manager|metacity|linux-image-generic)' | tr '\n' ' '))"
 }
 

@@ -84,6 +84,8 @@ check_squash() {   # $1 = ERE, $2 = human name
         die "$2 missing from the squashfs"
     fi
 }
+check_squash 'sbin/init$'                 "/sbin/init (without it the live boot panics: Attempted to kill init)"
+check_squash 'lib/systemd/systemd$'       "systemd (usr/lib/systemd/systemd)"
 check_squash 'bin/hde-session$'      "usr/bin/hde-session"
 check_squash 'bin/nexwm$'            "usr/bin/nexwm"
 check_squash 'sessions/hde.desktop$' "hde.desktop session"
