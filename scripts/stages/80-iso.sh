@@ -53,7 +53,7 @@ PROMPT 0
 LABEL genmenu
   MENU LABEL NexWM OS
   KERNEL /casper/vmlinuz
-  APPEND initrd=/casper/initrd boot=casper console=ttyS0,115200 console=tty0 quiet splash
+  APPEND initrd=/casper/initrd boot=casper console=ttyS0,115200 console=tty0
 
 LABEL safe
   MENU LABEL NexWM OS (safe graphics)
@@ -68,7 +68,7 @@ set default=0
 
 menuentry 'NexWM OS (live)' --id live {
     search --no-floppy --label --set=root "NEXWMOS"
-    linux /casper/vmlinuz boot=casper console=ttyS0,115200 console=tty0 quiet splash
+    linux /casper/vmlinuz boot=casper console=ttyS0,115200 console=tty0
     initrd /casper/initrd
 }
 

@@ -36,8 +36,21 @@ locale-gen >/dev/null
 localectl set-locale LANG=C.UTF-8 2>/dev/null || true
 
 step "initramfs (casper hooks) + kernel polish"
+# A live medium must boot on hardware the build host knows nothing about:
+# MODULES=most (never "dep", which only keeps what the build machine uses),
+# plus the storage / filesystem modules casper needs to find and mount
+# /casper/filesystem.squashfs from a CD-ROM, USB stick or virtio disk.
+mkdir -p /etc/initramfs-tools/conf.d
+echo 'MODULES=most' > /etc/initramfs-tools/conf.d/10-live-modules.conf
+for m in squashfs overlay isofs udf loop cdrom sr_mod sd_mod ata_piix ata_generic \
+         usb_storage uas virtio_blk virtio_pci virtio_scsi nvme; do
+    grep -qx "$m" /etc/initramfs-tools/modules 2>/dev/null || echo "$m" >> /etc/initramfs-tools/modules
+done
 depmod -a "$(ls -1 /lib/modules | sort -V | tail -n1)"
 update-initramfs -u -k all
+[ -e /usr/share/initramfs-tools/hooks/casper ] || die "casper's initramfs hook is missing: the initrd cannot find the live medium"
+lsinitramfs "/boot/initrd.img-$(ls -1 /lib/modules | sort -V | tail -n1)" | grep -q 'scripts/casper$' \
+    || die "the initramfs was built without casper's boot script (scripts/casper)"
 
 step "force graphical.target as the default boot target for the live medium"
 ln -sf /lib/systemd/system/graphical.target /etc/systemd/system/default.target

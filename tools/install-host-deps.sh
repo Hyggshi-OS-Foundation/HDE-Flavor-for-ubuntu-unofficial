@@ -14,6 +14,7 @@ apt-get install -y --no-install-recommends \
     isolinux syslinux-common \
     grub-common grub-pc-bin grub-efi-amd64-bin \
     mtools \
+    initramfs-tools-core \
     dosfstools \
     curl \
     git \

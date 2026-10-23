@@ -155,6 +155,12 @@ jobs:
           sudo apt-get update -qq
           sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y \
               qemu-system-x86 qemu-utils ovmf
+          # Hosted runners expose /dev/kvm but not to the runner user; open it up
+          # (the documented udev rule) so QEMU does not fall back to slow TCG.
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+              | sudo tee /etc/udev/rules.d/99-kvm4all.rules >/dev/null
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm || true
           ls -l /dev/kvm || echo "no /dev/kvm: the TCG fallback will be used (slower, still valid)"
 
       - name: Download the ISO from the nightly release

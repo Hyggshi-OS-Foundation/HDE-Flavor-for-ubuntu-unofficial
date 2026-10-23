@@ -50,6 +50,21 @@ for pkg in casper sddm metacity network-manager linux-image; do
     check_manifest_pkg "$pkg"
 done
 
+step "the shipped initrd can find and mount the live medium"
+if command -v lsinitramfs >/dev/null 2>&1; then
+    INITRD_LIST="$BUILD_LOG_DIR/initrd-list.txt"
+    lsinitramfs "$ISO_STAGE/casper/initrd" > "$INITRD_LIST" 2>"$BUILD_LOG_DIR/lsinitramfs.err" \
+        || { head -n 5 "$BUILD_LOG_DIR/lsinitramfs.err" >&2; die "lsinitramfs could not read casper/initrd"; }
+    grep -qE '(^|/)scripts/casper$' "$INITRD_LIST" \
+        || die "casper/initrd has no scripts/casper: it cannot find the live medium (kernel panics: Attempted to kill init)"
+    # Modules may legitimately be built into the kernel, so these only warn.
+    for mod in squashfs overlay isofs sr_mod ata_piix virtio_blk; do
+        grep -qE "/${mod}\.ko" "$INITRD_LIST" || echo "warning: ${mod}.ko is not in the initrd (fine only if built into the kernel)" >&2
+    done
+else
+    echo "warning: lsinitramfs not found on the host (initramfs-tools-core); initrd content not inspected" >&2
+fi
+
 step "HDE binaries are inside the squashfs"
 # List the image ONCE into a file and grep the file (a `| grep -q` pipeline
 # under pipefail can also fail spuriously via SIGPIPE). NOTE: squashfs-tools

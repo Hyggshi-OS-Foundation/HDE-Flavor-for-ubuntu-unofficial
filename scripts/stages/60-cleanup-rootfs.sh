@@ -63,6 +63,13 @@ step "verify the live runtime survived the cleanup"
 # ISO that boots to no session and cannot install anything; verify_live_packages
 # names the entry and halts with the stage in the log.
 verify_live_packages
+
+step "regenerate the initramfs from the final package set"
+# 70-squashfs copies /boot/initrd.img-* onto the medium: rebuild it now so it
+# reflects the rootfs exactly as it will be squashed (casper hooks included).
+update-initramfs -u -k all
+lsinitramfs "/boot/initrd.img-$(ls -1 /lib/modules | sort -V | tail -n1)" | grep -q 'scripts/casper$' \
+    || die "final initramfs has no casper boot script"
 rm -rf /var/lib/apt/lists/*
 # NOTE: the apt archives dir is bind-mounted to the CI-shared cache while the
 # chroot stages run; build.sh unmounts it and empties the chroot-side copy
