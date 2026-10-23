@@ -21,7 +21,7 @@ verify_live_packages() {
         dpkg-query -W -f='${db:Status-Status} ${binary:Package}\n' "$p" 2>/dev/null \
             | grep -qx "installed $p" || missing="$missing $p"
     done
-    [ -z "$missing" ] || die "live-runtime packages missing after this stage:$missing"
+    [ -z "$missing" ] || die "live-runtime packages missing after this stage:$missing (apt marks these as manually installed: $(apt-mark showmanual 2>/dev/null | grep -E '^(casper|sddm|network-manager|metacity|linux-image-generic)' | tr '\n' ' '))"
 }
 
 # Load config values (flavor.conf) unless the caller already did.

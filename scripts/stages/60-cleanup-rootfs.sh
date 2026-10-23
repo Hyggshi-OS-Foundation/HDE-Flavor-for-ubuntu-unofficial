@@ -30,11 +30,17 @@ apt-mark manual casper sddm metacity network-manager linux-generic \
 step "autoremove plan preflight"
 # autoremove has removed live-runtime packages before; ask it for its plan
 # first and refuse to run it when it lists any of the packages the live
-# system needs. The printed plan also documents HOW apt came to see them as
-# removable (orphan dependency). It names every entry and halts.
-PLAN=$(apt-get --assume-no autoremove --purge 2>/dev/null || true)
-if printf '%s\n' "$PLAN" | grep -qE '\b(casper|sddm|network-manager|metacity|linux-image-generic)\b'; then
-    printf '%s\n' "$PLAN" | grep -E 'REMOV|casper|sddm|network-manager|metacity|linux-image' | head -n 20 >&2
+# system needs. A simulation never touches dpkg state, so no lock issues:
+# explicit failures and empty plans are treated as suspicious and abort here
+# with the plan's name evidence in the log.
+if ! PLAN=$(apt-get -s autoremove --purge 2>&1); then
+    printf '%s\n' "$PLAN" >&2
+    die "the autoremove simulation failed; rejecting the cleanup step"
+fi
+if [ -z "$PLAN" ] \
+   || printf '%s\n' "$PLAN" | grep -qE '\b(casper|sddm|network-manager|metacity|linux-image-generic)\b'; then
+    printf '%s\n' "----- autoremove plan (suspicious or empty):" >&2
+    printf '%s\n' "$PLAN" | grep -E 'REMOV|casper|sddm|network-manager|metacity|linux-image|^Remv' | head -n 20 >&2
     die "autoremove is planning to remove live-runtime packages (see the plan above)"
 fi
 apt-get autoremove -y --purge || true
