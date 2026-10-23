@@ -68,11 +68,19 @@ run_firmware() {
     "${cmd[@]}" &
     QEMU_PID=$!
 
-    show_log() {   # the cause of a boot failure is at the top; the tail is a stack trace
-        echo "----- first 120 lines of the $mode serial log" >&2
-        head -n 120 "$log" >&2 || true
-        echo "----- last 25 lines" >&2
-        tail -n 25 "$log" >&2 || true
+    show_log() {
+        # The first ~100 lines are kernel/hardware setup. The cause of a live-boot
+        # failure is printed by the initramfs (casper), after "Run /init", and
+        # ahead of the panic's stack trace, so show that window.
+        if grep -q 'Run /init as init process' "$log" 2>/dev/null; then
+            echo "----- $mode: initramfs phase (from 'Run /init', first 90 lines)" >&2
+            sed -n '/Run \/init as init process/,$p' "$log" | head -n 90 >&2 || true
+        else
+            echo "----- $mode: the kernel never reached /init; log lines 60-160" >&2
+            sed -n '60,160p' "$log" >&2 || true
+        fi
+        echo "----- $mode: last 12 lines" >&2
+        tail -n 12 "$log" >&2 || true
     }
 
     # Wait for either the desktop marker, a panic, a timeout, or QEMU exiting early.
