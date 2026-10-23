@@ -24,6 +24,50 @@ verify_live_packages() {
     [ -z "$missing" ] || die "live-runtime packages missing after this stage:$missing (apt marks these as manually installed: $(apt-mark showmanual 2>/dev/null | grep -E '^(casper|sddm|network-manager|metacity|linux-image-generic)' | tr '\n' ' '))"
 }
 
+# Purge -dev/-dbg packages WITHOUT dragging anything else down with them.
+# `apt-get purge libfoo-dev` also removes every package that depends on it, and
+# `apt-mark manual` does not stop that when the removal is requested by name
+# (this is how casper, sddm and network-manager used to vanish). So: simulate
+# first, and only purge the candidates whose removal plan contains nothing but
+# -dev/-dbg packages. Anything that would take a runtime package with it stays.
+safe_purge_dev_packages() {
+    local re='-(dev|dbg)$'
+    local -a cands=() safe=()
+    local pkg name plan bad
+
+    mapfile -t cands < <(dpkg-query -W -f='${db:Status-Status} ${binary:Package}\n' \
+        | awk '$1 == "installed" { print $2 }' | grep -E -e '-(dev|dbg)(:[a-z0-9]+)?$' || true)
+    [ "${#cands[@]}" -gt 0 ] || { echo "no -dev/-dbg packages installed"; return 0; }
+
+    # collateral = names in an apt plan that are not -dev/-dbg packages
+    _collateral() { printf '%s\n' "$1" | awk '/^Remv /{ n=$2; sub(/:.*/,"",n); print n }' | grep -Ev -e "$re" || true; }
+
+    step "simulate purging all ${#cands[@]} -dev/-dbg packages together"
+    plan=$(apt-get -s purge --allow-remove-essential "${cands[@]}" 2>&1) || true
+    bad=$(_collateral "$plan")
+    if [ -z "$bad" ]; then
+        safe=("${cands[@]}")
+    else
+        step "collateral removals found; testing each package on its own:"
+        printf '  %s\n' $bad | sort -u | head -n 40
+        for pkg in "${cands[@]}"; do
+            plan=$(apt-get -s purge --allow-remove-essential "$pkg" 2>&1) || continue
+            [ -z "$(_collateral "$plan")" ] && safe+=("$pkg") || echo "  keeping $pkg (removal would take runtime packages with it)"
+        done
+    fi
+
+    [ "${#safe[@]}" -gt 0 ] || { echo "nothing safe to purge"; return 0; }
+
+    # Final check on the exact set we are about to purge (independent removals
+    # can still interact), then purge for real with output visible.
+    plan=$(apt-get -s purge --allow-remove-essential "${safe[@]}" 2>&1) || true
+    bad=$(_collateral "$plan")
+    [ -z "$bad" ] || die "safe -dev set still removes non-dev packages: $(echo $bad | tr '\n' ' ')"
+
+    step "purging ${#safe[@]} -dev/-dbg packages"
+    apt-get purge -y --allow-remove-essential "${safe[@]}"
+}
+
 # Load config values (flavor.conf) unless the caller already did.
 ensure_flavor_config() {
     # shellcheck disable=SC1091

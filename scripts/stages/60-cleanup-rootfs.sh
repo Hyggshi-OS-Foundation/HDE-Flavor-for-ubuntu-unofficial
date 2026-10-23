@@ -21,8 +21,11 @@ rm -f /usr/sbin/policy-rc.d
 # after it, before autoremove gets a chance.
 apt-mark manual casper sddm metacity network-manager linux-generic \
     linux-image-generic sudo 2>/dev/null || true
-apt-get purge -y --allow-remove-essential \
-    $(dpkg-query -W -f='${binary:Package}\n' | grep -E '(-dev|-dbg)$') 2>/dev/null || true
+export DEBIAN_FRONTEND=noninteractive
+# safe_purge_dev_packages (common.sh) simulates the purge and skips every
+# -dev/-dbg package whose removal would also remove a non-dev package, so the
+# runtime can no longer be cascaded away. Errors are NOT swallowed any more.
+safe_purge_dev_packages
 
 step "verify the live runtime survived the -dev purge"
 # If the purge took casper/sddm/network-manager with it, this names it HERE
