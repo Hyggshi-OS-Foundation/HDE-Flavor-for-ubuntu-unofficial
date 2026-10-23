@@ -51,12 +51,26 @@ for pkg in casper sddm metacity network-manager linux-image; do
 done
 
 step "HDE binaries are inside the squashfs"
-unsquashfs -list "$ISO_STAGE/casper/filesystem.squashfs" 2>/dev/null \
-    | grep -qE 'bin/hde-session$' || die "usr/bin/hde-session missing from the squashfs"
-unsquashfs -list "$ISO_STAGE/casper/filesystem.squashfs" 2>/dev/null \
-    | grep -qE 'bin/nexwm$' || die "usr/bin/nexwm missing from the squashfs"
-unsquashfs -list "$ISO_STAGE/casper/filesystem.squashfs" 2>/dev/null \
-    | grep -qE 'sessions/hde.desktop$' || die "hde.desktop session missing from the squashfs"
+# List the image ONCE into a file and grep the file. Piping unsquashfs into
+# `grep -q` under pipefail is a false-negative generator: grep exits at the
+# first match, unsquashfs dies of SIGPIPE (141) on the huge listing, and the
+# pipeline is reported as failed even though the file is present.
+SQUASH_LIST="$BUILD_LOG_DIR/squashfs-list.txt"
+unsquashfs -list "$ISO_STAGE/casper/filesystem.squashfs" > "$SQUASH_LIST" 2>"$BUILD_LOG_DIR/unsquashfs.err" \
+    || { cat "$BUILD_LOG_DIR/unsquashfs.err" >&2; die "unsquashfs could not list the image"; }
+[ -s "$SQUASH_LIST" ] || die "unsquashfs produced an empty listing"
+
+check_squash() {   # $1 = ERE, $2 = human name
+    if ! grep -qE "$1" "$SQUASH_LIST"; then
+        echo "squashfs entries that look related (diagnostic):" >&2
+        grep -iE '(hde|nexwm)' "$SQUASH_LIST" | grep -E '(/bin/|/sbin/|sessions/|/opt/)' | head -n 30 >&2 \
+            || echo "  (none)" >&2
+        die "$2 missing from the squashfs"
+    fi
+}
+check_squash 'bin/hde-session$'      "usr/bin/hde-session"
+check_squash 'bin/nexwm$'            "usr/bin/nexwm"
+check_squash 'sessions/hde.desktop$' "hde.desktop session"
 
 step "checksum"
 (cd "$ISO_OUT_DIR" && sha256sum --check "$ISO_NAME.sha256")

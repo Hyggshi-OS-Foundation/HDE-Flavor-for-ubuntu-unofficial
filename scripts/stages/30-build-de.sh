@@ -38,6 +38,9 @@ verify_live_packages
 step "verify the sessions a login screen sees"
 ls -1 /usr/share/xsessions/
 [ -f /usr/share/xsessions/hde.desktop ] || die "hde.desktop session missing"
+for b in hde-session nexwm; do
+    command -v "$b" >/dev/null 2>&1 || { ls -la /usr/bin /usr/local/bin 2>/dev/null | grep -iE 'hde|nexwm' >&2 || true; die "$b is not installed after the HDE build (upstream installer changed?)"; }
+done
 [ -f /usr/share/xsessions/nexwm.desktop ] || die "nexwm.desktop session missing"
 [ -f /usr/share/wayland-sessions/hde-wayland.desktop ] || true
 
