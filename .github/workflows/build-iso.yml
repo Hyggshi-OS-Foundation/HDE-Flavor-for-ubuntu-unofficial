@@ -118,11 +118,10 @@ jobs:
           iso_path=$(ls -1 "$WORKDIR"/out/*.iso | head -n1)
           echo "name=$(basename "$iso_path")" >> "$GITHUB_OUTPUT"
 
-      # ISOs are far larger than any private-repo artifact allowance, so they
-      # travel through a rolling "nightly" RELEASE instead of Actions
-      # artifacts: release assets do not count against the Actions storage
-      # quota. The QEMU job and (on tags) the real release download it back
-      # from here.
+      # The QEMU job and (on tags) the real release download the ISO from a
+      # rolling "nightly" RELEASE: release assets do not count against the
+      # Actions storage quota. The ISO is additionally exported as a workflow
+      # artifact below for convenience (best effort, see that step).
       - name: Publish the ISO to the rolling nightly release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -139,6 +138,44 @@ jobs:
               --notes "Automated development build of commit $GITHUB_SHA. Pre-release: the QEMU firmware smoke tests have not run for this ISO yet." \
               --prerelease
           gh release upload nightly "$ISO_NAME" "$ISO_NAME.sha256" --clobber
+
+      - name: Export the ISO as a workflow artifact
+        # Download straight from the run page (Summary -> Artifacts). The ISO is
+        # already compressed, so store it as-is (compression-level 0) to save
+        # minutes. continue-on-error: a full Actions storage quota (ISOs are
+        # large) must not fail an otherwise good build; the nightly release
+        # above stays the primary delivery channel.
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexwm-os-iso-${{ github.run_number }}
+          path: |
+            ${{ env.WORKDIR }}/out/*.iso
+            ${{ env.WORKDIR }}/out/*.iso.sha256
+          compression-level: 0
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Summarize the ISO on the run page
+        if: always()
+        run: |
+          {
+            echo "## NexWM OS ISO"
+            if ls "$WORKDIR"/out/*.iso >/dev/null 2>&1; then
+              iso=$(ls -1 "$WORKDIR"/out/*.iso | head -n1)
+              echo ""
+              echo "| | |"
+              echo "|---|---|"
+              echo "| File | \`$(basename "$iso")\` |"
+              echo "| Size | $(du -h "$iso" | cut -f1) |"
+              echo "| SHA256 | \`$(cut -d' ' -f1 "$iso.sha256" 2>/dev/null || sha256sum "$iso" | cut -d' ' -f1)\` |"
+              echo ""
+              echo "- Artifact: **nexwm-os-iso-${{ github.run_number }}** (Summary -> Artifacts, kept 7 days)"
+              echo "- Release: https://github.com/${{ github.repository }}/releases/tag/nightly"
+            else
+              echo "No ISO was produced by this run."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
 
   qemusmoke:
     name: QEMU smoke (BIOS + UEFI)

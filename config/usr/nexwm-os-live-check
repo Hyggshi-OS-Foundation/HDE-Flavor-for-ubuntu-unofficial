@@ -2,54 +2,103 @@
 # nexwm-os-live-check — smoke helper for the live ISO.
 #
 # Runs as a systemd service only on the live medium (ConditionKernelCommandLine
-# in the unit) and waits for the HDE desktop of the auto-logged-in user to be
-# fully up, then prints a machine-readable marker on the console. The QEMU
-# smoke test on GitHub Actions greps the serial console for exactly this
-# marker; when it (or the unit's timeout) is seen, QEMU is torn down and the
-# test passes or fails accordingly.
+# in the unit). It waits for the desktop of the auto-logged-in user to be up,
+# then prints a machine-readable marker on the console. The QEMU smoke test on
+# GitHub Actions greps the serial console for exactly this marker.
+#
+# "Desktop is up" means: the live user is running the program the configured
+# SDDM session starts (the Exec= of /usr/share/xsessions/<session>.desktop),
+# or an hde-panel. If that never happens, a diagnostic dump (failed units,
+# SDDM and session logs, X errors) goes to the console before the machine is
+# powered off, so a CI failure explains itself.
 
 set -u
 
 MARKER="NEXWMOS_SMOKE_OK"
-TIMEOUT="${NEXWMOS_SMOKE_TIMEOUT:-900}"
+TIMEOUT="${NEXWMOS_SMOKE_TIMEOUT:-420}"
 
-announce() {
-    # Serial + journal + every tty the kernel knows about.
-    for dev in /dev/console /dev/tty0 /dev/ttyS0; do
-        [ -e "$dev" ] && echo "$*" >> "$dev" 2>/dev/null
-    done
-    logger -t nexwm-os-live-check "$*"
+emit() {
+    # One line to the console the CI serial log captures, without doubling up
+    # when /dev/console already is ttyS0; also into the journal.
+    local line="$*" active
+    active="$(cat /sys/class/tty/console/active 2>/dev/null || true)"
+    [ -e /dev/console ] && echo "$line" > /dev/console 2>/dev/null
+    case "$active" in
+        *ttyS0*) ;;
+        *) [ -e /dev/ttyS0 ] && echo "$line" > /dev/ttyS0 2>/dev/null ;;
+    esac
+    logger -t nexwm-os-live-check -- "$line" 2>/dev/null || true
 }
 
 # Which user did casper create for this boot?
 LIVE_USER=""
 for source in /etc/casper.conf /run/casper.conf; do
-    if [ -f "$source" ] && grep -q '^USERNAME=' "$source"; then
-        LIVE_USER="$(sed -n 's/^USERNAME="\?\([^"]*\)"\?$/\1/p' "$source" | head -n 1)"
+    if [ -f "$source" ] && grep -q 'USERNAME=' "$source"; then
+        LIVE_USER="$(sed -n 's/^\(export \)\?USERNAME="\?\([^"]*\)"\?$/\2/p' "$source" | head -n 1)"
         [ -n "$LIVE_USER" ] && break
     fi
 done
-if [ -z "$LIVE_USER" ]; then
-    LIVE_USER="$(getent passwd '1000' | cut -d: -f1)"
-fi
+[ -n "$LIVE_USER" ] || LIVE_USER="$(getent passwd '1000' | cut -d: -f1)"
 [ -n "$LIVE_USER" ] || LIVE_USER="ubuntu"
-echo "nexwm-os-live-check: watching for the desktop of user '$LIVE_USER'"
+
+# Which program does the autologin session start?
+SESSION="$(awk -F= '/^DEFAULT_SESSION=/{gsub(/"/,"",$2); print $2}' /etc/os-release 2>/dev/null)"
+[ -n "$SESSION" ] || SESSION="nexwm"
+SESSION_BIN=""
+for f in "/usr/share/xsessions/$SESSION.desktop" "/usr/share/wayland-sessions/$SESSION.desktop"; do
+    if [ -f "$f" ]; then
+        SESSION_BIN="$(sed -n 's/^Exec=//p' "$f" | head -n 1 | awk '{print $1}' | xargs -r basename)"
+        break
+    fi
+done
+
+emit "nexwm-os-live-check: watching for the desktop of '$LIVE_USER' (session '$SESSION', program '${SESSION_BIN:-unknown}', timeout ${TIMEOUT}s)"
+
+desktop_up() {
+    [ -n "$SESSION_BIN" ] && pgrep -u "$LIVE_USER" -f "(^|/)${SESSION_BIN}( |\$)" >/dev/null 2>&1 && return 0
+    pgrep -u "$LIVE_USER" -f '(^|/)hde-panel( |$)' >/dev/null 2>&1
+}
+
+diag() {
+    emit "NEXWMOS_DIAG_BEGIN ($1)"
+    {
+        echo "--- user: $(id "$LIVE_USER" 2>&1)"
+        echo "--- session: $SESSION -> ${SESSION_BIN:-no .desktop file found}"
+        ls -l /usr/share/xsessions /usr/share/wayland-sessions 2>&1 | head -n 12
+        echo "--- failed units"; systemctl --failed --no-legend --no-pager 2>&1 | head -n 15
+        echo "--- sddm: $(systemctl is-active sddm 2>&1)"
+        systemctl status sddm --no-pager -n 12 2>&1 | head -n 22
+        echo "--- sddm config"; cat /etc/sddm.conf.d/*.conf 2>/dev/null | grep -vE '^(#|$)' | head -n 25
+        echo "--- logind sessions"; loginctl list-sessions --no-legend 2>&1 | head -n 5
+        echo "--- processes"
+        ps -eo user:12,pid,args 2>&1 | grep -E 'sddm|Xorg|Xwayland|hde|nexwm|startx|dbus-run' | grep -v grep | cut -c1-160 | head -n 25
+        echo "--- sddm journal"; journalctl -b -u sddm --no-pager -n 25 2>&1 | cut -c1-200
+        echo "--- X errors"
+        grep -hE '\(EE\)|Fatal|no screens' /var/log/Xorg.*.log /var/lib/sddm/.local/share/sddm/*.log 2>/dev/null | head -n 15
+        echo "--- session errors"
+        tail -n 20 "/home/$LIVE_USER/.xsession-errors" 2>&1 | cut -c1-200
+        echo "--- live-user journal"
+        journalctl -b "_UID=$(id -u "$LIVE_USER" 2>/dev/null)" --no-pager -n 25 2>&1 | cut -c1-200
+        echo "--- recent warnings"; journalctl -b -p warning --no-pager -n 20 2>&1 | cut -c1-200
+    } 2>&1 | while IFS= read -r line; do emit "DIAG: $line"; done
+    emit "NEXWMOS_DIAG_END"
+}
 
 start=$(date +%s)
 while :; do
-    if pgrep -u "$LIVE_USER" -f '(/usr/bin/)?hde-panel' >/dev/null 2>&1; then
-        announce "$MARKER"
+    if desktop_up; then
+        emit "$MARKER"
         sleep 10
-        announce "NEXWMOS_SMOKE_DONE"
-        systemd-detect-virt >/dev/null 2>&1 || true
+        emit "NEXWMOS_SMOKE_DONE"
         systemctl poweroff --no-wall || poweroff -f
         exit 0
     fi
     now=$(date +%s)
-    [ "$((now - start))" -ge "$TIMEOUT" ] && {
-        announce "NEXWMOS_SMOKE_TIMEOUT: desktop did not appear within ${TIMEOUT}s"
+    if [ "$((now - start))" -ge "$TIMEOUT" ]; then
+        diag "desktop did not appear within ${TIMEOUT}s"
+        emit "NEXWMOS_SMOKE_TIMEOUT: desktop did not appear within ${TIMEOUT}s"
         systemctl poweroff --no-wall || poweroff -f
         exit 1
-    }
+    fi
     sleep 5
 done

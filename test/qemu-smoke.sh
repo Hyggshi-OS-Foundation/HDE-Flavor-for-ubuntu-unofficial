@@ -92,6 +92,12 @@ run_firmware() {
             kill "$QEMU_PID" 2>/dev/null || true
             return 1
         fi
+        if grep -q 'NEXWMOS_SMOKE_TIMEOUT' "$log" 2>/dev/null; then
+            echo "$mode: the live system booted but the desktop never came up (after ${waited}s)" >&2
+            sed -n '/NEXWMOS_DIAG_BEGIN/,/NEXWMOS_SMOKE_TIMEOUT/p' "$log" | cut -c1-220 | head -n 140 >&2
+            kill "$QEMU_PID" 2>/dev/null || true
+            return 1
+        fi
         if grep -q "$MARKER" "$log" 2>/dev/null; then
             echo "$mode: desktop marker seen after ${waited}s"
             sleep 3
