@@ -38,10 +38,18 @@ du -B1M -s "$ROOTFS" | cut -f1 > "$ISO_STAGE/casper/filesystem.size"
 printf '%s live build (%s; based on Ubuntu %s LTS)\n' \
     "$FLAVOR_NAME" "$(date -u +%Y%m%dT%H%M%SZ)" "$BASE_SUITE" > "$ISO_STAGE/.disk/info"
 
-step "mksquashfs (zstd; pseudo-filesystem mounts are empty after teardown)"
+step "mount points the live system needs (casper mounts /dev, /proc, /sys onto /root/*)"
+# They MUST exist in the image as empty directories. Excluding them by name
+# (`-e dev`) drops the directories themselves, and the live boot then dies in
+# casper-bottom ("mounting /dev on /root/dev failed: No such file or directory",
+# no /dev/null, no live user) and panics with "Attempted to kill init".
+mkdir -p "$ROOTFS/proc" "$ROOTFS/sys" "$ROOTFS/dev" "$ROOTFS/run" "$ROOTFS/mnt" "$ROOTFS/media" "$ROOTFS/tmp"
+chmod 1777 "$ROOTFS/tmp"
+
+step "mksquashfs (zstd; the CONTENTS of proc/sys/dev are excluded, the directories are kept)"
 if ! mksquashfs "$ROOTFS" "$ISO_STAGE/casper/filesystem.squashfs" \
     -noappend -comp zstd -Xcompression-level 19 \
-    -e proc -e sys -e dev \
+    -wildcards -e 'proc/*' -e 'sys/*' -e 'dev/*' \
     > "${BUILD_LOG_DIR:-$PWD}/mksquashfs.log" 2>&1; then
     echo "mksquashfs failed; the tail of its log follows:" >&2
     tail -n 30 "${BUILD_LOG_DIR:-$PWD}/mksquashfs.log" >&2 || true
