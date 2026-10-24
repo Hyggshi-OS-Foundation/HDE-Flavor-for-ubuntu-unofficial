@@ -10,7 +10,12 @@
 # SDDM session starts (the Exec= of /usr/share/xsessions/<session>.desktop),
 # or an hde-panel. If that never happens, a diagnostic dump (failed units,
 # SDDM and session logs, X errors) goes to the console before the machine is
-# powered off, so a CI failure explains itself.
+# shown, so a CI failure explains itself.
+#
+# This helper NEVER powers the machine off or reboots it: it only reports. The
+# CI job stops QEMU itself as soon as it sees the marker, and on a real user's
+# live session (where the output goes to the serial console and the journal,
+# not to the screen) it must not interfere with the desktop at all.
 
 set -u
 
@@ -88,17 +93,14 @@ start=$(date +%s)
 while :; do
     if desktop_up; then
         emit "$MARKER"
-        sleep 10
         emit "NEXWMOS_SMOKE_DONE"
-        systemctl poweroff --no-wall || poweroff -f
         exit 0
     fi
     now=$(date +%s)
     if [ "$((now - start))" -ge "$TIMEOUT" ]; then
         diag "desktop did not appear within ${TIMEOUT}s"
         emit "NEXWMOS_SMOKE_TIMEOUT: desktop did not appear within ${TIMEOUT}s"
-        systemctl poweroff --no-wall || poweroff -f
-        exit 1
+        exit 0   # informational only: do not leave a failed unit on a user's live session
     fi
     sleep 5
 done
