@@ -4,3 +4,16 @@
 # ones in config/calamares/, installed by scripts/50-installer.sh.
 
 calamares
+
+# Tools the Calamares modules run (installed with --no-install-recommends, so
+# they are NOT pulled in as recommendations of calamares):
+#   unpackfs   -> unsquashfs (squashfs-tools) + rsync (already in base.list)
+#   partition  -> parted, dosfstools (mkfs.fat for the EFI system partition)
+#   bootloader -> efibootmgr (UEFI entry), grub-pc-bin (BIOS grub-install)
+# Missing squashfs-tools gave "Bad unpackfs configuration: Failed to find
+# unsquashfs" at the end of an installation.
+squashfs-tools
+parted
+dosfstools
+efibootmgr
+grub-pc-bin

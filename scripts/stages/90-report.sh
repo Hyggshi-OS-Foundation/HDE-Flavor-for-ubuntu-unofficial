@@ -88,6 +88,8 @@ for d in dev proc sys run; do
     grep -qx "squashfs-root/$d" "$SQUASH_LIST" \
         || die "the squashfs has no /$d mount point (casper cannot mount /dev, /proc, /sys onto the live root: boot panics)"
 done
+check_squash 'bin/unsquashfs$'            "usr/bin/unsquashfs (Calamares unpackfs cannot install without it)"
+check_squash 'bin/calamares$'             "usr/bin/calamares"
 check_squash 'sbin/init$'                 "/sbin/init (without it the live boot panics: Attempted to kill init)"
 check_squash 'lib/systemd/systemd$'       "systemd (usr/lib/systemd/systemd)"
 check_squash 'bin/hde-session$'      "usr/bin/hde-session"

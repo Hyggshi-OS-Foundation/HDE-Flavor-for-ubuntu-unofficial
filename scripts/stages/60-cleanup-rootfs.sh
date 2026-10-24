@@ -64,6 +64,13 @@ step "verify the live runtime survived the cleanup"
 # names the entry and halts with the stage in the log.
 verify_live_packages
 
+step "installer tools survived the cleanup"
+missing=""
+for t in calamares unsquashfs rsync parted mkfs.fat efibootmgr grub-install; do
+    command -v "$t" >/dev/null 2>&1 || missing="$missing $t"
+done
+[ -z "$missing" ] || die "installer tools missing from the rootfs after cleanup:$missing (Calamares would fail: e.g. 'Failed to find unsquashfs')"
+
 step "regenerate the initramfs from the final package set"
 # 70-squashfs copies /boot/initrd.img-* onto the medium: rebuild it now so it
 # reflects the rootfs exactly as it will be squashed (casper hooks included).
